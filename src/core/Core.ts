@@ -19,7 +19,7 @@ import {
 import { Squad } from "./squad/Squad";
 import { SquadMember } from "./squad/SquadMember"
 
-import { client, w3cwebsocket, IMessageEvent } from "websocket";
+import { w3cwebsocket, IMessageEvent } from "websocket";
 
 export class SquadStats {
 
