@@ -1,5 +1,3 @@
-import * as $ from "jquery";
-
 import * as axios from "axios";
 
 export type ResponseContent<T> =

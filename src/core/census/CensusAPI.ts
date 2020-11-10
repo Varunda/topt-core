@@ -1,6 +1,5 @@
 import { ApiResponse } from "./ApiWrapper";
 
-import * as $ from "jquery";
 import * as axios from "axios";
 
 export default class CensusAPI {
