@@ -744,8 +744,6 @@ export default class EventReporter {
 
         const arr: BreakdownArray = new BreakdownArray();
 
-        times[0].infil.secondsAs
-
         const infil: Breakdown = {
             amount: 0,
             color: undefined,
