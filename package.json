@@ -1,9 +1,9 @@
 {
   "name": "topt-core",
   "version": "0.3.1",
-  "description": "Core of ",
-  "main": "build/index.js",
-  "types": "build/index.d.ts",
+  "description": "Core of TOPT",
+  "main": "build/core/index.js",
+  "types": "build/core/index.d.ts",
   "scripts": {
     "prepare": "npm run build",
     "test": "jest --config jestconfig.json",
