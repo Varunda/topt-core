@@ -1175,4 +1175,3 @@ export default class EventReporter {
     }
 
 }
-(window as any).EventReporter = EventReporter;

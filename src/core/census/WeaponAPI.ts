@@ -1,7 +1,7 @@
 import CensusAPI from "./CensusAPI";
 import { ApiResponse } from "./ApiWrapper";
 
-import * as $ from "jquery";
+import * as axios from "axios";
 
 export class Weapon {
     public ID: string = "";
@@ -44,6 +44,7 @@ export class WeaponAPI {
     }
 
     public static loadJson(): void {
+        /*
         const response = new ApiResponse(
             $.get("/data/weapons_new.json"),
             ((data: any) => {
@@ -54,6 +55,7 @@ export class WeaponAPI {
                 }
             })
         )
+        */
     }
 
     public static getEntires(): Weapon[] {
@@ -168,4 +170,3 @@ export class WeaponAPI {
     }
 
 }
-(window as any).WeaponAPI = WeaponAPI;

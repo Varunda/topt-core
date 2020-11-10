@@ -1,7 +1,7 @@
 import CensusAPI from "./CensusAPI";
 import { ApiResponse } from "./ApiWrapper";
 
-import * as $ from "jquery";
+import * as axios from "axios";
 
 export class Facility {
     public ID: string = "";
@@ -32,6 +32,7 @@ export class FacilityAPI {
     private static _timeoutID: number = -1;
 
     public static loadJson(): void {
+        /*
         new ApiResponse(
             $.get("/bases.json"),
             ((data: any) => {
@@ -42,6 +43,7 @@ export class FacilityAPI {
                 }
             })
         );
+        */
     }
 
     public static precache(facilityID: string): void {
@@ -168,4 +170,3 @@ export class FacilityAPI {
     }
 
 }
-(window as any).FacilityAPI = FacilityAPI;

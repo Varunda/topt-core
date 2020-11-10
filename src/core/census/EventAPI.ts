@@ -108,4 +108,3 @@ export class EventAPI {
     */
 
 }
-(window as any).EventAPI = EventAPI;

@@ -1260,4 +1260,3 @@ export class IndividualReporter {
     }
 
 }
-(window as any).IndividualReporter = IndividualReporter;

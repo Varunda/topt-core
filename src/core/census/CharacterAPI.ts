@@ -172,4 +172,3 @@ export class CharacterAPI {
     }
 
 }
-(window as any).CharacterAPI = CharacterAPI;

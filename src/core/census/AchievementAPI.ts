@@ -107,4 +107,3 @@ export class AchievementAPI {
     }
 
 }
-(window as any).AchievementAPI = AchievementAPI;

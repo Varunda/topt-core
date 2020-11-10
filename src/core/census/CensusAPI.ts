@@ -1,6 +1,7 @@
 import { ApiResponse } from "./ApiWrapper";
 
 import * as $ from "jquery";
+import * as axios from "axios";
 
 export default class CensusAPI {
 
@@ -26,7 +27,7 @@ export default class CensusAPI {
         }
 
         return new ApiResponse<T>(
-            $.get(`https://census.daybreakgames.com/s:${CensusAPI.serviceID}/get/ps2:v2${url}`),
+            axios.default.get(`https://census.daybreakgames.com/s:${CensusAPI.serviceID}/get/ps2:v2${url}`),
             reader
         );
     }
@@ -41,10 +42,9 @@ export default class CensusAPI {
         }
 
         return new ApiResponse(
-            $.get(`https://census.daybreakgames.com/s:${CensusAPI.serviceID}/get/ps2:v2${url}`),
+            axios.default.get(`https://census.daybreakgames.com/s:${CensusAPI.serviceID}/get/ps2:v2${url}`),
             ((elem: any) => elem)
         );
     }
 
 }
-(window as any).CensusAPI = CensusAPI;

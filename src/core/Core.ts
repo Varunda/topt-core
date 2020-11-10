@@ -350,4 +350,3 @@ export class Core {
     }
 
 }
-(window as any).Core = Core;

@@ -1,5 +1,7 @@
 import * as $ from "jquery";
 
+import * as axios from "axios";
+
 export type ResponseContent<T> =
     { code: 200, data: T } // OK
     | { code: 201, data: string | number } // Created
@@ -88,11 +90,40 @@ export class ApiResponse<T = void> {
      * @param responseData  Request that is being performed, and will produce a response
      * @param reader        Function that will read the data from a successful request into the type param T
      */
-    public constructor(responseData: JQueryXHR | null = null, reader: ((iter: any) => T) | null = null) {
+    public constructor(responseData: Promise<axios.AxiosResponse> | null = null, reader: ((iter: any) => T) | null = null) {
         if (responseData == null) {
             return;
         }
 
+        responseData.then((data: axios.AxiosResponse<any>) => {
+            let localStatus: number = data.status;
+            let localData: any = data.data;
+
+            // Handle errors from the API, which aren't request errors
+            if (localStatus == 200 && reader != null) {
+                if (localData.error != undefined || localData.errorCode != undefined || localData == "") {
+                    localStatus = 500;
+                }
+            }
+
+            // TODO: Get rid of this any
+            // I need to figure out a way to remove this any. Because the type of each element in codes is
+            //      a ResponseCode, not a number, and localStatus is a number, TS assumes that this can't be possible,
+            //      when in fact it is
+            if (ApiResponse.codes.indexOf(localStatus as any) == -1) {
+                throw `Unhandle status code: ${localStatus}`;
+            }
+
+            // TODO: AHHHH, it's an any!
+            // I need to find a better way to do this. Because the type of data is not known, Typescript rightly
+            //      assumes that code could be 204 and data is a string, which doesn't meet the requirements of a
+            //      ResponseContent. Maybe use a switch on localStatus?
+            this.resolve({ code: localStatus as ResponseCodes, data: localData } as any);
+        }).catch((error: any) => {
+            throw `Don't expect this`;
+        });
+
+        /*
         // JQuery uses data and jq differently depending on if the request is rejected (status code 404/500)
         // or accepted (anything but a 404/500), so that's pretty neat :^)
         responseData.always((data: any, state: string, jq: any) => {
@@ -150,6 +181,7 @@ export class ApiResponse<T = void> {
             //      ResponseContent. Maybe use a switch on localStatus?
             this.resolve({ code: localStatus as ResponseCodes, data: localData } as any);
         });
+        */
     }
 
     /**
@@ -352,7 +384,6 @@ export class ApiResponse<T = void> {
     }
 
 }
-(window as any).ApiResponse = ApiResponse;
 
 /**
  * Abstract wrapper class used by API wrappers
@@ -406,9 +437,11 @@ export abstract class APIWrapper<T> {
             }
         }
 
-        const promise = $.get({
+        const promise = axios.default.request({
             url: url,
-            data: data
+            data: JSON.stringify(data),
+            validateStatus: null,
+            method: "GET"
         });
 
         // Bind this to ensure that .readEntry by binding the inherited class instead of
@@ -429,9 +462,11 @@ export abstract class APIWrapper<T> {
      * @returns The ApiResponse that is being performed. Add callbacks using .ok(), etc.
      */
     protected single(url: string, data?: any): ApiResponse<T | null> {
-        const promise = $.get({
+        const promise = axios.default.request({
             url: url,
-            data: data
+            data: JSON.stringify(data),
+            validateStatus: null,
+            method: "GET"
         });
 
         let result: ApiResponse<T | null> = new ApiResponse<T | null>(promise, this.readEntry);
@@ -449,10 +484,12 @@ export abstract class APIWrapper<T> {
      * @returns The ApiResponse that is being performed. Add callbacks using .ok(), etc.
      */
     protected post(url: string, data?: any): ApiResponse {
-        const promise = $.post({
-            url: `${url}`,
-            contentType: "application/json",
-            data: JSON.stringify(data)
+        const promise = axios.default.request({
+            url: url,
+            responseType: "json",
+            data: JSON.stringify(data),
+            validateStatus: null,
+            method: "POST"
         });
 
         let result: ApiResponse = new ApiResponse(promise, null);
@@ -469,10 +506,11 @@ export abstract class APIWrapper<T> {
      * @returns The ApiResponse that is being performed. Add callbacks using .ok(), etc.
      */
     protected postReply<U>(url: string, data?: any): ApiResponse<U | null> {
-        const promise = $.post({
-            url: `${url}`,
-            contentType: "application/json",
-            data: JSON.stringify(data)
+        const promise = axios.default.request({
+            url: url,
+            data: JSON.stringify(data),
+            validateStatus: null,
+            method: "POST"
         });
 
         let result: ApiResponse<U | null> = new ApiResponse<U | null>(promise, null);
@@ -493,11 +531,11 @@ export abstract class APIWrapper<T> {
      * @returns The ApiResponse that is being performed. Add callbacks using .ok(), etc.
      */
     protected put(url: string, data?: any): ApiResponse {
-        const promise = $.ajax({
-            url: `${url}`,
-            contentType: "application/json",
+        const promise = axios.default.request({
+            url: url,
             data: JSON.stringify(data),
-            type: "PUT"
+            validateStatus: null,
+            method: "PUT"
         });
 
         let result: ApiResponse = new ApiResponse(promise, null);
@@ -515,11 +553,11 @@ export abstract class APIWrapper<T> {
      * @returns The ApiResponse that is being performed. Add callbacks using .ok(), etc.
      */
     protected delete(url: string, data?: any): ApiResponse {
-        const promise = $.ajax({
-            url: `${url}`,
-            contentType: "application/json",
+        const promise = axios.default.request({
+            url: url,
             data: JSON.stringify(data),
-            type: "DELETE"
+            validateStatus: null,
+            method: "DELETE"
         });
 
         let result: ApiResponse = new ApiResponse(promise, null);
@@ -528,4 +566,3 @@ export abstract class APIWrapper<T> {
     }
 
 }
-export default APIWrapper;

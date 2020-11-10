@@ -94,4 +94,3 @@ export class VehicleAPI {
         return VehicleAPI._cache;
     }
 }
-(window as any).VehicleAPI = VehicleAPI;

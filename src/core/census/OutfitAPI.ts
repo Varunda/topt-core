@@ -127,4 +127,3 @@ export class OutfitAPI {
     }
 
 }
-(window as any).OutfitAPI = OutfitAPI;
