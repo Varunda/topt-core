@@ -1,6 +1,9 @@
 import CensusAPI from "./CensusAPI";
 import { ApiResponse } from "./ApiWrapper";
 
+import logger from "loglevel";
+const log = logger.getLogger("AchievementAPI");
+
 export class Achievement {
     public ID: string = "";
     public name: string = "";
@@ -47,7 +50,7 @@ export class AchievementAPI {
                     const wep: Achievement = AchievementAPI.parseCharacter(data.item_list[0]);
                     if (!AchievementAPI._cache.has(wep.ID)) {
                         AchievementAPI._cache.set(wep.ID, wep);
-                        console.log(`Cached ${wep.ID}: ${JSON.stringify(wep)}`);
+                        log.trace(`Cached ${wep.ID}: ${JSON.stringify(wep)}`);
                     }
                     response.resolveOk(wep);
                 }
@@ -94,7 +97,7 @@ export class AchievementAPI {
                         const wep: Achievement = AchievementAPI.parseCharacter(datum);
                         weapons.push(wep);
                         AchievementAPI._cache.set(wep.ID, wep);
-                        console.log(`Cached ${wep.ID}`);
+                        log.trace(`Cached ${wep.ID}`);
                     }
                     response.resolveOk(weapons);
                 }

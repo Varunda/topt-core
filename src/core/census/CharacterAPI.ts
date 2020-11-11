@@ -1,6 +1,9 @@
 import CensusAPI from "./CensusAPI";
 import { ApiResponse } from "./ApiWrapper";
 
+import logger from "loglevel";
+const log = logger.getLogger("CharacterAPI");
+
 export class Character {
     public ID: string = "";
     public name: string = "";
@@ -113,11 +116,11 @@ export class CharacterAPI {
         if (requestIDs.length > 0) {
             const sliceSize: number = 50;
             let slicesLeft: number = Math.ceil(requestIDs.length / sliceSize);
-            //console.log(`Have ${slicesLeft} slices to do. size of ${sliceSize}, data of ${requestIDs.length}`);
+            //log.log(`Have ${slicesLeft} slices to do. size of ${sliceSize}, data of ${requestIDs.length}`);
 
             for (let i = 0; i < requestIDs.length; i += sliceSize) {
                 const slice: string[] = requestIDs.slice(i, i + sliceSize);
-                //console.log(`Slice ${i}: ${i} - ${i + sliceSize - 1}: [${slice.join(",")}]`);
+                //log.log(`Slice ${i}: ${i} - ${i + sliceSize - 1}: [${slice.join(",")}]`);
 
                 const request: ApiResponse<any> = CensusAPI.get(
                     `/character/?character_id=${slice.join(",")}&c:resolve=outfit,online_status`
@@ -139,10 +142,10 @@ export class CharacterAPI {
 
                     --slicesLeft;
                     if (slicesLeft == 0) {
-                        //console.log(`No more slices left, resolving`);
+                        //log.log(`No more slices left, resolving`);
                         response.resolveOk(chars);
                     } else {
-                        //console.log(`${slicesLeft} slices left`);
+                        //log.log(`${slicesLeft} slices left`);
                     }
                 });
             }

@@ -1,6 +1,9 @@
 import CensusAPI from "./CensusAPI";
 import { ApiResponse } from "./ApiWrapper";
 
+import logger from "loglevel";
+const log = logger.getLogger("VehicleAPI");
+
 export class Vehicle {
     public ID: string = "";
     public name: string = "";
@@ -87,7 +90,7 @@ export class VehicleAPI {
                     vehicles.push(VehicleAPI.parse(datum));
                 }
                 VehicleAPI._cache!.resolveOk(vehicles);
-                console.log(`Cached ${vehicles.length} vehicles: [${vehicles.map(iter => iter.name).join(",")}]`);
+                log.debug(`Cached ${vehicles.length} vehicles: [${vehicles.map(iter => iter.name).join(",")}]`);
             });
         }
 

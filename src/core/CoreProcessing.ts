@@ -19,6 +19,9 @@ import {
     TEventHandler
 } from "./events/index";
 
+import logger from "loglevel";
+const log = logger.getLogger("Core.Processing");
+
 declare module "./Core" {
 
     export interface Core {
@@ -61,10 +64,10 @@ declare module "./Core" {
             if (eventID == "1410") {
                 if (self.stats.get(charID) != undefined) {
                     if (self.routerTracking.routerNpcs.has(charID)) {
-                        //console.log(`${charID} router npc check for ${targetID}`);
+                        //log.debug(`${charID} router npc check for ${targetID}`);
                         const router: TrackedRouter = self.routerTracking.routerNpcs.get(charID)!;
                         if (router.ID != targetID) {
-                            //console.warn(`New router placed by ${charID}, missed ItemAdded event: removing old one and replacing with ${targetID}`);
+                            //log.warn(`New router placed by ${charID}, missed ItemAdded event: removing old one and replacing with ${targetID}`);
                             router.destroyed = timestamp;
 
                             self.routerTracking.routers.push({...router});
@@ -79,7 +82,7 @@ declare module "./Core" {
                                 type: "router"
                             });
                         } else {
-                            //console.log(`Same router, incrementing count`);
+                            //log.debug(`Same router, incrementing count`);
                             if (router.ID == "") {
                                 router.ID = targetID;
                             }
@@ -89,7 +92,7 @@ declare module "./Core" {
                             ++router.count;
                         }
                     } else {
-                        //console.log(`${charID} has new router ${targetID} placed/used`);
+                        //log.debug(`${charID} has new router ${targetID} placed/used`);
 
                         self.routerTracking.routerNpcs.set(charID, {
                             ID: targetID,
@@ -109,7 +112,7 @@ declare module "./Core" {
                 const ids: string[] = trackedNpcs.map(iter => iter.ID);
                 if (ids.indexOf(targetID) > -1) {
                     const router: TrackedRouter = trackedNpcs.find(iter => iter.ID == targetID)!;
-                    //console.log(`Router ${router.ID} placed by ${router.owner} destroyed, saving`);
+                    //log.debug(`Router ${router.ID} placed by ${router.owner} destroyed, saving`);
 
                     router.destroyed = timestamp;
                     self.routerTracking.routers.push({...router});
@@ -136,7 +139,7 @@ declare module "./Core" {
             const player = self.stats.get(charID);
             if (player != undefined) {
                 if (Number.isNaN(amount)) {
-                    console.warn(`NaN amount from event: ${JSON.stringify(msg)}`);
+                    log.warn(`NaN amount from event: ${JSON.stringify(msg)}`);
                 } else {
                     player.score += amount;
                 }
@@ -170,7 +173,7 @@ declare module "./Core" {
                     if (target.recentDeath != null) {
                         target.recentDeath.revived = true;
                         target.recentDeath.revivedEvent = ev;
-                        //console.log(`${targetID} died but was revived by ${charID}`);
+                        //log.debug(`${targetID} died but was revived by ${charID}`);
                     }
 
                     target.stats.decrement(PsEvent.death);
@@ -193,12 +196,12 @@ declare module "./Core" {
 
             const targetLoadout: PsLoadout | undefined = PsLoadouts.get(targetLoadoutID);
             if (targetLoadout == undefined) {
-                return console.warn(`Unknown target loadout ID: ${targetLoadoutID}`);
+                return log.warn(`Unknown target loadout ID: ${targetLoadoutID}`);
             }
 
             const sourceLoadout: PsLoadout | undefined = PsLoadouts.get(sourceLoadoutID);
             if (sourceLoadout == undefined) {
-                return console.warn(`Unknown source loadout ID: ${sourceLoadoutID}`);
+                return log.warn(`Unknown source loadout ID: ${sourceLoadoutID}`);
             }
 
             let targetTicks = self.stats.get(targetID);
@@ -341,7 +344,7 @@ declare module "./Core" {
             const facilityID: string = msg.payload.facility_id;
 
             FacilityAPI.getByID(facilityID).ok((data: Facility) => {
-                console.log(`New facility capture: ${data.name}`);
+                log.trace(`New facility capture: ${data.name}`);
 
                 const capture: FacilityCapture = {
                     facilityID: data.ID,
@@ -358,7 +361,7 @@ declare module "./Core" {
 
                 self.facilityCaptures.push(capture);
             }).noContent(() => {
-                console.error(`Failed to find facility ID ${facilityID}`);
+                log.error(`Failed to find facility ID ${facilityID}`);
             });
             save = true;
         } else if (event == "ItemAdded") {
@@ -367,11 +370,11 @@ declare module "./Core" {
 
             if (itemID == "6003551") {
                 if (self.stats.get(charID) != undefined) {
-                    //console.log(`${charID} pulled a new router`);
+                    //log.debug(`${charID} pulled a new router`);
 
                     if (self.routerTracking.routerNpcs.has(charID)) {
                         const router: TrackedRouter = self.routerTracking.routerNpcs.get(charID)!;
-                        //console.log(`${charID} pulled a new router, saving old one`);
+                        //log.debug(`${charID} pulled a new router, saving old one`);
                         router.destroyed = timestamp;
 
                         self.routerTracking.routers.push({...router});
@@ -464,18 +467,18 @@ declare module "./Core" {
                 self.removeMember(charID);
             }
         } else {
-            console.warn(`Unknown event type: ${event}\n${JSON.stringify(msg)}`);
+            log.warn(`Unknown event type: ${event}\n${JSON.stringify(msg)}`);
         }
     } else if (msg.type == "heartbeat") {
-        //console.log(`Heartbeat ${new Date().toISOString()}`);
+        //log.debug(`Heartbeat ${new Date().toISOString()}`);
     } else if (msg.type == "serviceStateChanged") {
-        console.log(`serviceStateChanged event`);
+        log.trace(`serviceStateChanged event`);
     } else if (msg.type == "connectionStateChanged") {
-        console.log(`connectionStateChanged event`);
+        log.trace(`connectionStateChanged event`);
     } else if (msg.type == undefined) {
         // Occurs in response to subscribing to new events
     } else {
-        console.warn(`Unchecked message type: '${msg.type}'`);
+        log.warn(`Unchecked message type: '${msg.type}'`);
     }
 
     if (save == true) {

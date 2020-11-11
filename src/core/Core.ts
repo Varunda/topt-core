@@ -21,6 +21,9 @@ import { SquadMember } from "./squad/SquadMember"
 
 import { w3cwebsocket, IMessageEvent } from "websocket";
 
+import logger from "loglevel";
+const log = logger.getLogger("Core");
+
 export class SquadStats {
 
     public name: string = "";
@@ -275,7 +278,7 @@ export class Core {
      */
     public subscribeToEvents(chars: Character[]): void {
         if (this.sockets.tracked == null) {
-            console.warn(`Cannot subscribe to events, tracked socket is null`);
+            log.warn(`Cannot subscribe to events, tracked socket is null`);
             return;
         }
 
@@ -309,7 +312,7 @@ export class Core {
         //      at once, instead breaking them into chunks works nicely
         const subscribeSetSize: number = 200;
         for (let i = 0; i < chars.length; i += subscribeSetSize) {
-            //console.log(`Slice: ${chars.slice(i, i + subscribeSetSize).map(iter => iter.ID).join(", ")}`);
+            //log.trace(`Slice: ${chars.slice(i, i + subscribeSetSize).map(iter => iter.ID).join(", ")}`);
             const subscribeExp: object = {
                 "action": "subscribe",
                 "characters": [
@@ -333,13 +336,13 @@ export class Core {
     public onmessage(ev: IMessageEvent): void {
         for (const message of this.socketMessageQueue) {
             if (ev.data == message) {
-                //console.log(`Duplicate message found: ${ev.data}`);
+                //log.warn(`Duplicate message found: ${ev.data}`);
                 return;
             }
         }
 
         if (typeof(ev.data) != "string") {
-            console.error(`Invalid type received from socket: ${typeof(ev.data)}`);
+            log.error(`Invalid type received from socket: ${typeof(ev.data)}`);
             return;
         }
 

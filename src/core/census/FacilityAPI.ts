@@ -1,7 +1,8 @@
 import CensusAPI from "./CensusAPI";
 import { ApiResponse } from "./ApiWrapper";
 
-import * as axios from "axios";
+import logger from "loglevel";
+const log = logger.getLogger("FacilityAPI");
 
 export class Facility {
     public ID: string = "";
@@ -68,7 +69,7 @@ export class FacilityAPI {
 
     public static getByID(facilityID: string): ApiResponse<Facility> {
         if (FacilityAPI._pending.has(facilityID)) {
-            console.log(`${facilityID} already has a pending request, using that one instead`);
+            log.trace(`${facilityID} already has a pending request, using that one instead`);
             return FacilityAPI._pending.get(facilityID)!;
         }
 
@@ -143,7 +144,7 @@ export class FacilityAPI {
                     for (const facID of requestIDs) {
                         const elem = bases.find(iter => iter.ID == facID);
                         if (elem == undefined) {
-                            console.log(`Failed to find Facility ID ${facID}, settings cache to null`);
+                            log.debug(`Failed to find Facility ID ${facID}, settings cache to null`);
                             FacilityAPI._cache.set(facID, null);
                         }
                     }
@@ -160,7 +161,7 @@ export class FacilityAPI {
                 } else {
                     response.resolve({ code: 500, data: "" });
                 }
-                console.error(err);
+                log.error(err);
             });
         } else {
             response.resolveOk(facilities);

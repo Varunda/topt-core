@@ -2,6 +2,9 @@ import CensusAPI from "./CensusAPI";
 import { ApiResponse } from "./ApiWrapper";
 import { CharacterAPI, Character } from "./CharacterAPI";
 
+import logger from "loglevel";
+const log = logger.getLogger("OutfitAPI");
+
 export class Outfit {
     ID: string = "";
     name: string = "";
@@ -51,7 +54,7 @@ export class OutfitAPI {
 
         const sliceSize: number = 50;
         let slicesLeft: number = Math.ceil(IDs.length / sliceSize);
-        console.log(`Have ${slicesLeft} slices to do. size of ${sliceSize}, data of ${IDs.length}`);
+        log.debug(`Have ${slicesLeft} slices to do. size of ${sliceSize}, data of ${IDs.length}`);
 
         for (let i = 0; i < IDs.length; i += sliceSize) {
             const slice: string[] = IDs.slice(i, i + sliceSize);
@@ -69,10 +72,10 @@ export class OutfitAPI {
 
                 --slicesLeft;
                 if (slicesLeft == 0) {
-                    console.log(`No more slices left, resolving`);
+                    log.debug(`No more slices left, resolving`);
                     response.resolveOk(outfits);
                 } else {
-                    console.log(`${slicesLeft} slices left`);
+                    log.trace(`${slicesLeft} slices left`);
                 }
             });
         }

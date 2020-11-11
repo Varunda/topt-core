@@ -19,6 +19,9 @@ import { IndividualReporter, TimeTracking, Playtime, FacilityCapture } from "./I
 import { TrackedPlayer } from "./TrackedPlayer";
 import { OutfitAPI, Outfit } from "./census/OutfitAPI";
 
+import logger from "loglevel";
+const log = logger.getLogger("EventReporter");
+
 export class BreakdownArray {
     data: Breakdown[] = [];
     total: number = 0;
@@ -172,7 +175,7 @@ export default class EventReporter {
             .map(iter => iter.outfitID)
             .filter((value, index, arr) => arr.indexOf(value) == index);
 
-        console.log(`Have ${data.captures.length} captures`);
+        log.debug(`Have ${data.captures.length} captures`);
 
         OutfitAPI.getByIDs(outfitIDs).ok((data: Outfit[]) => {
             for (const capture of captures) {
@@ -192,7 +195,7 @@ export default class EventReporter {
                 const outfitID: string = capture.outfitID;
                 const outfit: Outfit | undefined = data.find(iter => iter.ID == outfitID);
                 if (outfit == undefined) {
-                    console.warn(`Missing outfit ${outfitID}`);
+                    log.warn(`Missing outfit ${outfitID}`);
                     continue;
                 }
 
@@ -273,7 +276,7 @@ export default class EventReporter {
             return ApiResponse.resolve({ code: 204, data: null });
         }
 
-        console.log(`charIDs: [${Array.from(exp.getMap().keys()).join(", ")}]`);
+        log.debug(`charIDs: [${Array.from(exp.getMap().keys()).join(", ")}]`);
 
         return statMapToBreakdown(exp,
             CharacterAPI.getByIDs,
@@ -307,7 +310,7 @@ export default class EventReporter {
                 if (ev.type == "kill" || ev.type == "death") {
                     const killedChar = data.find(iter => iter.ID == ev.targetID);
                     if (killedChar == undefined) {
-                        console.warn(`Missing ${ev.type} targetID ${ev.targetID}`);
+                        log.warn(`Missing ${ev.type} targetID ${ev.targetID}`);
                     } else {
                         const outfitID: string = killedChar.outfitID;
 
@@ -424,7 +427,7 @@ export default class EventReporter {
             const minutesOnline: number = secondsOnline / 60;
             const kpm = Number.parseFloat((count / minutesOnline).toFixed(2));
 
-            console.log(`${player.name} got ${count} kills on ${loadout} in ${minutesOnline} minutes (${kpm})`);
+            log.debug(`${player.name} got ${count} kills on ${loadout} in ${minutesOnline} minutes (${kpm})`);
 
             kpms.push(kpm);
         }
@@ -463,8 +466,6 @@ export default class EventReporter {
             if (killCount == 0 || deathCount == 0) {
                 continue;
             }
-
-            //console.log(`${player.name} went ${killCount} / ${deathCount} on ${loadout}`);
 
             const kd = Number.parseFloat((killCount / deathCount).toFixed(2));
             kds.push(kd);
@@ -557,7 +558,7 @@ export default class EventReporter {
                     || b.type.localeCompare(a.type);
             });
 
-            console.log(`Missing weapons:`, missingWeapons);
+            log.info(`Missing weapons:`, missingWeapons);
 
             response.resolveOk(types);
         });

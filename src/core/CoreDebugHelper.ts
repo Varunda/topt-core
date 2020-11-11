@@ -1,5 +1,8 @@
 import { Core } from "./Core";
 
+import logger from "loglevel";
+const log = logger.getLogger("Core.Debug");
+
 declare module "./Core" {
 
     export interface Core {
@@ -36,12 +39,12 @@ declare module "./Core" {
         .reduce((acc, cur) => { acc.push(...cur); return acc; }, [])
         .filter(iter => iter.type == "exp" && iter.expID == expID);
 
-    console.log(events);
+    log.debug(events);
 }
 
 Core.prototype.subscribeToEvent = function(...expID: string[]): void {
     if (this.sockets.debug == null) {
-        return console.error(`Cannot globally subscribe to ${expID}: debug socket is null`);
+        return log.error(`Cannot globally subscribe to ${expID}: debug socket is null`);
     }
 
     const msg: object = {
@@ -62,7 +65,7 @@ Core.prototype.subscribeToEvent = function(...expID: string[]): void {
 
 Core.prototype.subscribeToAllEvent = function(...expID: string[]): void {
     if (this.sockets.debug == null) {
-        return console.error(`Cannot globally subscribe to ${expID}: debug socket is null`);
+        return log.error(`Cannot globally subscribe to ${expID}: debug socket is null`);
     }
 
     const msg: object = {
@@ -80,7 +83,7 @@ Core.prototype.subscribeToAllEvent = function(...expID: string[]): void {
 
 Core.prototype.subscribeToItemAdded = function(): void {
     if (this.sockets.debug == null) {
-        return console.error(`Cannot subscribe to ItemAdded events: debug socket is null`);
+        return log.error(`Cannot subscribe to ItemAdded events: debug socket is null`);
     }
 
     const msg: object = { 

@@ -1,7 +1,8 @@
 import CensusAPI from "./CensusAPI";
 import { ApiResponse } from "./ApiWrapper";
 
-import * as axios from "axios";
+import logger from "loglevel";
+const log = logger.getLogger("WeaponAPI");
 
 export class Weapon {
     public ID: string = "";
@@ -104,7 +105,7 @@ export class WeaponAPI {
                 }
             }).internalError((err: string) => {
                 WeaponAPI._cache.set(weaponID, null);
-                console.error(err);
+                log.error(err);
             }).always(() => {
                 WeaponAPI._pendingRequests.delete(weaponID);
             });
@@ -155,12 +156,12 @@ export class WeaponAPI {
                     WeaponAPI._cache.set(wepID, null);
                 }
                 if (weapons.length > 0) {
-                    console.error(`API call failed, but some weapons were cached, so using that`);
+                    log.error(`API call failed, but some weapons were cached, so using that`);
                     response.resolveOk(weapons);
                 } else {
                     response.resolve({ code: 500, data: "" });
                 }
-                console.error(err);
+                log.error(err);
             });
         } else {
             response.resolveOk(weapons);

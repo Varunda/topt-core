@@ -19,6 +19,9 @@ import {
     TEventHandler
 } from "../events/index";
 
+import logger from "loglevel";
+const log = logger.getLogger("WinterReportGenerator");
+
 export class WinterMetricIndex {
     public static KILLS: number = 0;
     public static KD: number = 1;

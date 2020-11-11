@@ -2,7 +2,10 @@ import { Core } from "./Core";
 
 import { ApiResponse } from "./census/ApiWrapper";
 
-import { client, w3cwebsocket, IMessageEvent } from "websocket";
+import { w3cwebsocket, IMessageEvent } from "websocket";
+
+import logger from "loglevel";
+const log = logger.getLogger("Core:Connection");
 
 declare module "./Core" {
 
@@ -62,8 +65,8 @@ declare module "./Core" {
     self.connected = false;
 };
 
-(Core as any).prototype.onSocketError = function(socketName: string, ev: Error): void {
-    console.error(`Error on socket: ${socketName}> ${ev}`);
+Core.prototype.onSocketError = function(socketName: string, ev: Error): void {
+    log.error(`Error on socket: ${socketName}> ${ev}`);
 }
 
 function setupTrackerSocket(core: Core): ApiResponse {

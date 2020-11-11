@@ -7,6 +7,9 @@ import { PsEvent, PsEvents } from "./PsEvent";
 import { Squad } from "./squad/Squad";
 import { SquadMember } from "./squad/SquadMember";
 
+import logger from "loglevel";
+const log = logger.getLogger("Core.Squad");
+
 declare module "./Core" {
 
     export interface Core {
@@ -115,18 +118,6 @@ const nonSquadEvents: string[] = [
     PsEvent.spotKill,
 ];
 
-const log = (msg: any): void => {
-    console.log(`[CoreSquad] ${msg}`);
-}
-
-const warn = (msg: any): void => {
-    console.warn(`[CoreSquad] ${msg}`);
-}
-
-const debug = (msg: any): void => {
-    console.log(`[CoreSquad] ${msg}`);
-}
-
 Core.prototype.squadInit = function(): void {
     // Make the four default squads
     this.createPermSquad();
@@ -173,7 +164,7 @@ function sortSquad(squad: Squad): void {
 Core.prototype.addMember = function(char: { ID: string, name: string, outfitTag: string }): void {
     if (this.squad.members.has(char.ID)) {
         this.squad.members.get(char.ID)!.online = true;
-        debug(`${char.name}/${char.ID} was online before, setting online again`);
+        log.debug(`${char.name}/${char.ID} was online before, setting online again`);
         return;
     }
 
@@ -193,7 +184,7 @@ Core.prototype.addMember = function(char: { ID: string, name: string, outfitTag:
     const member: SquadMember = this.squad.members.get(char.ID)!;
     member.online = true;
 
-    debug(`Started squad tracking ${char.name}/${char.ID}`);
+    log.debug(`Started squad tracking ${char.name}/${char.ID}`);
 
     const squad: Squad = this.createGuessSquad();
     squad.members.push(member);
@@ -260,7 +251,7 @@ const validRespawnEvent = (ev: TExpEvent, whenDied: number | null): boolean => {
 
     /*
     if (whenDied != null) {
-        console.log(`It's been ${ev.timestamp - whenDied} ms since death`);
+        log.log(`It's been ${ev.timestamp - whenDied} ms since death`);
         if (((ev.expID == PsEvent.revive || ev.expID == PsEvent.squadRevive) && (ev.timestamp - whenDied <= 5)) // Revive nades take 2.5 seconds to prime
             || ((ev.expID == PsEvent.heal || ev.expID == PsEvent.squadHeal) && (ev.timestamp - whenDied <= 15)) // Heal nades last for 10? seconds
         ) {
@@ -288,7 +279,7 @@ Core.prototype.processExperienceEvent = function(event: TExpEvent): void {
         if (this.squad.members.has(event.sourceID)) {
             const member: SquadMember = this.squad.members.get(event.sourceID)!;
             if (member.whenBeacon == null) {
-                console.log(`${member.name} placed a beacon`);
+                log.debug(`${member.name} placed a beacon`);
 
                 member.beaconCooldown = 300;
                 member.whenBeacon = new Date().getTime();
@@ -317,7 +308,7 @@ Core.prototype.processExperienceEvent = function(event: TExpEvent): void {
             case "heavy": member.class = "H"; break;
             case "max": member.class = "W"; break;
             case "unknown":
-                warn(`Unknown class from event: ${event}`);
+                log.warn(`Unknown class from event: ${event}`);
                 member.class = ""; 
                 break;
         }
@@ -346,7 +337,7 @@ Core.prototype.processExperienceEvent = function(event: TExpEvent): void {
     // Check if the squads need to be merged into one another if this was a squad exp source
     if (squadEvents.indexOf(event.trueExpID) > -1) {
         if (sourceSquad.ID == targetSquad.ID) {
-            //console.log(`${sourceMember.name} // ${targetMember.name} are already in a squad`);
+            //log.log(`${sourceMember.name} // ${targetMember.name} are already in a squad`);
         } else {
             const ev: PsEvent | undefined = PsEvents.get(event.expID);
 
@@ -355,19 +346,19 @@ Core.prototype.processExperienceEvent = function(event: TExpEvent): void {
             //      2. One squad isn't a guess => Move guess squad into non-guess squad
             //      3. Neither squad is a guess => Move member who performed action into other squad
             if (targetSquad.guess == true && sourceSquad.guess == true) {
-                debug(`Both guesses, merging ${sourceMember.name} (${sourceSquad}) into ${targetMember.name} (${targetSquad}) from ${ev?.name}`);
+                log.debug(`Both guesses, merging ${sourceMember.name} (${sourceSquad}) into ${targetMember.name} (${targetSquad}) from ${ev?.name}`);
 
                 this.mergeSquads(sourceSquad, targetSquad);
             } else if (targetSquad.guess == false && sourceSquad.guess == true) {
-                debug(`Target is not a guess, merging ${sourceMember.name} (${sourceSquad}) into ${targetMember.name} (${targetSquad}) from ${ev?.name}`);
+                log.debug(`Target is not a guess, merging ${sourceMember.name} (${sourceSquad}) into ${targetMember.name} (${targetSquad}) from ${ev?.name}`);
 
                 this.mergeSquads(targetSquad, sourceSquad);
             } else if (targetSquad.guess == true && sourceSquad.guess == false) {
-                debug(`Source is not a guess, merging ${targetMember.name} (${targetSquad}) into ${sourceMember.name} (${sourceSquad}) from ${ev?.name}`);
+                log.debug(`Source is not a guess, merging ${targetMember.name} (${targetSquad}) into ${sourceMember.name} (${sourceSquad}) from ${ev?.name}`);
 
                 this.mergeSquads(sourceSquad, targetSquad);
             } else if (targetSquad.guess == false && sourceSquad.guess == false) {
-                debug(`Neither squad is a guess, moving ${targetMember.name} into ${sourceMember} (${sourceSquad}) from ${ev?.name}`);
+                log.debug(`Neither squad is a guess, moving ${targetMember.name} into ${sourceMember} (${sourceSquad}) from ${ev?.name}`);
                 sourceSquad.members.push(targetMember);
                 targetSquad.members = targetSquad.members.filter(iter => iter.charID != targetMember.charID);
             }
@@ -379,9 +370,9 @@ Core.prototype.processExperienceEvent = function(event: TExpEvent): void {
 
     // Check if the squad is no longer valid and needs to be removed, i.e. moved squads
     if (nonSquadEvents.indexOf(event.trueExpID) > -1) {
-        //console.log(`Non squad event: ${event.trueExpID}`);
+        //log.log(`Non squad event: ${event.trueExpID}`);
         if (sourceSquad.ID == targetSquad.ID) {
-            debug(`${sourceMember.name} was in squad with ${targetMember.name}, but didn't get an expect squad exp event`);
+            log.debug(`${sourceMember.name} was in squad with ${targetMember.name}, but didn't get an expect squad exp event`);
 
             targetSquad.members = targetSquad.members.filter(iter => iter.charID != sourceMember.charID);
 
@@ -407,21 +398,21 @@ Core.prototype.getSquad = function(squadName: string): Squad | null {
 Core.prototype.addMemberToSquad = function(charID: string, squadName: string): void {
     const member: SquadMember | undefined = this.squad.members.get(charID);
     if (member == undefined) {
-        return warn(`Cannot move ${charID} to ${squadName}: ${charID} is not a squad member`);
+        return log.warn(`Cannot move ${charID} to ${squadName}: ${charID} is not a squad member`);
     }
 
     const squad: Squad | null = this.getSquad(squadName);
     if (squad == null) {
-        return warn(`Cannot move ${charID} to ${squadName}: squad ${squadName} does not exist`);
+        return log.warn(`Cannot move ${charID} to ${squadName}: squad ${squadName} does not exist`);
     }
 
     if (squad.members.find(iter => iter.charID == charID) != null) {
-        return debug(`${charID} is already part of squad ${squadName}, no need to move`);
+        return log.debug(`${charID} is already part of squad ${squadName}, no need to move`);
     }
 
     const oldSquad: Squad | null = this.getSquadOfMember(charID);
     if (oldSquad != null) {
-        debug(`${charID} is currently in ${oldSquad.name}, moving out of it`);
+        log.debug(`${charID} is currently in ${oldSquad.name}, moving out of it`);
         oldSquad.members = oldSquad.members.filter(iter => iter.charID != charID);
 
         if (oldSquad.members.length == 0 && oldSquad.guess == true) {
@@ -458,7 +449,7 @@ Core.prototype.mergeSquads = function(into: Squad, from: Squad): void {
     from.members = [];
 
     if (from.guess == true) {
-        debug(`${from.name} is a guess, removing from list`);
+        log.debug(`${from.name} is a guess, removing from list`);
         this.squad.guesses = this.squad.guesses.filter(iter => iter.ID != from.ID);
     }
 }
@@ -478,7 +469,7 @@ Core.prototype.createGuessSquad = function(): Squad {
     squad.name = squadNames[(squadNameIndex++) % 26];
     squad.guess = true;
 
-    debug(`Created new guess squad ${squad.name}`);
+    log.debug(`Created new guess squad ${squad.name}`);
 
     this.squad.guesses.push(squad);
 
@@ -491,7 +482,7 @@ Core.prototype.createPermSquad = function(): Squad {
     squad.guess = false;
     squad.display = permSquadNames[(this.squad.perm.length % permSquadNames.length)];
 
-    debug(`Created new perm squad ${squad.name}/${squad.display}`);
+    log.trace(`Created new perm squad ${squad.name}/${squad.display}`);
 
     this.squad.perm.push(squad);
 
@@ -515,7 +506,7 @@ Core.prototype.removePermSquad = function(squadName: string): void {
 }
 
 Core.prototype.removeMember = function(charID: string): void {
-    log(`${charID} is offline`);
+    log.trace(`${charID} is offline`);
 
     if (this.squad.members.has(charID)) {
         const char: SquadMember = this.squad.members.get(charID)!

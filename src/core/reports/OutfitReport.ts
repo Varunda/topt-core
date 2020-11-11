@@ -27,6 +27,9 @@ import { SquadStats }  from "../Core";
 import { TrackedPlayer } from "../TrackedPlayer";
 import { Squad } from "../squad/Squad";
 
+import logger from "loglevel";
+const log = logger.getLogger("OutfitReport");
+
 export class OutfitReportSettings {
 
     /**
@@ -311,7 +314,7 @@ export class OutfitReportGenerator {
 
         const callback = (step: string) => {
             return () => {
-                console.log(`Finished ${step}: Have ${opsLeft - 1} ops left outta ${totalOps}`);
+                log.debug(`Finished ${step}: Have ${opsLeft - 1} ops left outta ${totalOps}`);
                 if (--opsLeft == 0) {
                     response.resolveOk(report);
                 }
@@ -421,7 +424,7 @@ export class OutfitReportGenerator {
             }
 
             if (!report.classStats.has(statName)) {
-                //console.log(`Added stats for '${statName}'`);
+                //log.debug(`Added stats for '${statName}'`);
                 report.classStats.set(statName, classCollectionNumber());
             }
 
@@ -580,7 +583,7 @@ export class OutfitReportGenerator {
                 }
             }
         }
-        console.log(`Untracked experience IDs: ${otherIDs.filter((v, i, a) => a.indexOf(v) == i).join(", ")}`);
+        log.debug(`Untracked experience IDs: ${otherIDs.filter((v, i, a) => a.indexOf(v) == i).join(", ")}`);
 
         // Sort all the entries by score, followed by amount, then lastly name
         report.scoreBreakdown = [...breakdown.entries()].sort((a, b) => {

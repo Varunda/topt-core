@@ -23,6 +23,9 @@ import {
 
 import { TrackedPlayer } from "./TrackedPlayer";
 
+import logger from "loglevel";
+const log = logger.getLogger("IndividualGenerator");
+
 export class ClassBreakdown {
     secondsAs: number = 0;
     score: number = 0;
@@ -321,7 +324,7 @@ export class IndividualReporter {
 
         const callback = (step: string) => {
             return () => {
-                console.log(`Finished ${step}: Have ${opsLeft - 1} ops left outta ${totalOps}`);
+                log.debug(`Finished ${step}: Have ${opsLeft - 1} ops left outta ${totalOps}`);
                 if (--opsLeft == 0) {
                     response.resolveOk(report);
                 }
@@ -462,7 +465,7 @@ export class IndividualReporter {
                         deathsMap.get(ev.targetID)!.increment(weaponName);
                     }
                 } else {
-                    console.error(`Unchecked event type: '${ev}'`);
+                    log.error(`Unchecked event type: '${ev}'`);
                 }
 
                 const encounter: PlayerVersusEntry = {
@@ -477,11 +480,11 @@ export class IndividualReporter {
 
             for (const entry of versus) {
                 if (killsMap.has(entry.charID) == false) {
-                    console.error(`Missing killsMap entry for ${entry.name}`);
+                    log.error(`Missing killsMap entry for ${entry.name}`);
                     continue;
                 }
                 if (deathsMap.has(entry.charID) == false) {
-                    console.error(`Missing deathsMap entry for ${entry.name}`);
+                    log.error(`Missing deathsMap entry for ${entry.name}`);
                     continue;
                 }
 
@@ -699,7 +702,7 @@ export class IndividualReporter {
 
             EventReporter.experienceSource(ids, parameters.player.characterID, parameters.events).ok((data: BreakdownArray) => {
                 meta.data = data;
-                console.log(`Found [${data.data.map(iter => `${iter.display}:${iter.amount}`).join(", ")}] for [${ids.join(", ")}]`);
+                log.trace(`Found [${data.data.map(iter => `${iter.display}:${iter.amount}`).join(", ")}] for [${ids.join(", ")}]`);
                 response.resolveOk(meta);
             });
         }
@@ -776,73 +779,6 @@ export class IndividualReporter {
         return rts;
     }
 
-    private static transportAssists(parameters: ReportParameters): ApiResponse<BreakdownMeta | null> {
-        const response: ApiResponse<BreakdownMeta | null> = new ApiResponse();
-        
-        const transAssists: TExpEvent[] = parameters.player.events.filter(iter => iter.type == "exp" && iter.expID == "30") as TExpEvent[];
-        if (transAssists.length > 0) {
-            const killedIDs: string[] = transAssists.map(iter => iter.targetID).filter((iter, index, arr) => arr.indexOf(iter) == index);
-
-            const firstEv: number = Math.min(...transAssists.map(iter => iter.timestamp));
-            const lastEv: number = Math.max(...transAssists.map(iter => iter.timestamp));
-
-            const map: StatMap = new StatMap();
-
-            const meta: BreakdownMeta = new BreakdownMeta();
-            meta.title = "Transport assists";
-            meta.data = new BreakdownArray();
-
-            /*
-            EventAPI.getMultiDeaths(killedIDs, firstEv, lastEv).ok((data: TDeathEvent[]) => {
-                const killers: string[] = [];
-
-                for (const assist of transAssists) {
-                    const death = data.find(iter => iter.sourceID == assist.targetID && iter.timestamp == assist.timestamp);
-                    if (death == undefined) {
-                        console.warn(`Missing event death for transport assist for ${assist.targetID} at ${assist.timestamp}`);
-                        continue;
-                    }
-                    killers.push(death.targetID);
-                }
-
-                CharacterAPI.getByIDs(killers.filter((v, i, a) => a.indexOf(v) == i)).ok((data: Character[]) => {
-                    for (const killer of killers) {
-                        const killerChar = data.find(iter => iter.ID == killer);
-                        if (killerChar == undefined) {
-                            console.warn(`Missing character ${killer} when generating transport assists`);
-                            continue;
-                        }
-
-                        map.increment(killerChar.name);
-                    }
-
-                    map.getMap().forEach((amount: number, char: string) => {
-                        const breakdown: Breakdown = {
-                            display: char,
-                            sortField: char,
-                            amount: amount,
-                            color: undefined
-                        };
-
-                        meta.data.data.push(breakdown);
-                        meta.data.total += amount;
-                    });
-
-                    meta.data.data.sort((a, b) => {
-                        return (b.amount - a.amount) || a.sortField.localeCompare(b.sortField);
-                    });
-
-                    response.resolveOk(meta);
-                });
-            });
-            */
-        } else {
-            response.resolve({ code: 204, data: null });
-        }
-
-        return response;
-    }
-
     private static calculatedStats(parameters: ReportParameters, classKd: ClassUsage): Map<string, string> {
         const map: Map<string, string> = new Map<string, string>();
 
@@ -901,7 +837,7 @@ export class IndividualReporter {
                 score.amount += 1;
 
                 if (exp == PsEvent.other) {
-                    //console.log(`Other: ${JSON.stringify(event)}`);
+                    //log.log(`Other: ${JSON.stringify(event)}`);
                 }
             }
         }
@@ -941,7 +877,7 @@ export class IndividualReporter {
                         case "engineer":  kds.engineer.kills += 1; break;
                         case "heavy":  kds.heavy.kills += 1; break;
                         case "max": kds.max.kills += 1; break;
-                        default: console.warn(`Unknown type`);
+                        default: log.warn(`Unknown type`);
                     }
                 }
                 if (event.type == "death" && event.revived == false) {
@@ -952,7 +888,7 @@ export class IndividualReporter {
                         case "engineer":  kds.engineer.deaths += 1; break;
                         case "heavy":  kds.heavy.deaths += 1; break;
                         case "max": kds.max.deaths += 1; break;
-                        default: console.warn(`Unknown type`);
+                        default: log.warn(`Unknown type`);
                     }
                 }
                 if (event.type == "death" && event.revived == true) {
@@ -963,7 +899,7 @@ export class IndividualReporter {
                         case "engineer":  kds.engineer.score += 1; break;
                         case "heavy":  kds.heavy.score += 1; break;
                         case "max": kds.max.score += 1; break;
-                        default: console.warn(`Unknown type`);
+                        default: log.warn(`Unknown type`);
                     }
                 }
             }
@@ -994,7 +930,7 @@ export class IndividualReporter {
 
             lastLoadout = PsLoadouts.get(event.loadoutID);
             if (lastLoadout == undefined) {
-                return console.warn(`Unknown loadout ID: ${event.loadoutID}`);
+                return log.warn(`Unknown loadout ID: ${event.loadoutID}`);
             }
 
             if (event.type == "exp") {
@@ -1008,7 +944,7 @@ export class IndividualReporter {
                     case "engineer":  usage.engineer.secondsAs += diff; break;
                     case "heavy":  usage.heavy.secondsAs += diff; break;
                     case "max": usage.max.secondsAs += diff; break;
-                    default: console.warn(`Unknown type`);
+                    default: log.warn(`Unknown type`);
                 }
             }
 
@@ -1020,7 +956,7 @@ export class IndividualReporter {
                     case "engineer":  usage.engineer.score += event.amount; break;
                     case "heavy":  usage.heavy.score += event.amount; break;
                     case "max": usage.max.score += event.amount; break;
-                    default: console.warn(`Unknown type`);
+                    default: log.warn(`Unknown type`);
                 }
             } else if (event.type == "kill") {
                 switch (lastLoadout.type) {
@@ -1030,7 +966,7 @@ export class IndividualReporter {
                     case "engineer":  usage.engineer.kills += 1; break;
                     case "heavy":  usage.heavy.kills += 1; break;
                     case "max": usage.max.kills += 1; break;
-                    default: console.warn(`Unknown type`);
+                    default: log.warn(`Unknown type`);
                 }
             } else if (event.type == "death" && event.revived == false) {
                 switch (lastLoadout.type) {
@@ -1040,7 +976,7 @@ export class IndividualReporter {
                     case "engineer":  usage.engineer.deaths += 1; break;
                     case "heavy":  usage.heavy.deaths += 1; break;
                     case "max": usage.max.deaths += 1; break;
-                    default: console.warn(`Unknown type`);
+                    default: log.warn(`Unknown type`);
                 }
             }
         });
@@ -1110,7 +1046,7 @@ export class IndividualReporter {
             });
 
             if (index == -1) {
-                console.error(`Failed to find a death for ${ev.sourceID} at ${ev.timestamp} but wasn't found in charEvents`);
+                log.error(`Failed to find a death for ${ev.sourceID} at ${ev.timestamp} but wasn't found in charEvents`);
                 continue;
             }
 
@@ -1123,7 +1059,7 @@ export class IndividualReporter {
             }
 
             if (nextDeath == null) {
-                console.error(`Failed to find the next death for ${ev.sourceID} at ${ev.timestamp}`);
+                log.error(`Failed to find the next death for ${ev.sourceID} at ${ev.timestamp}`);
                 continue;
             }
 
@@ -1151,7 +1087,7 @@ export class IndividualReporter {
             });
 
             if (index == -1) {
-                console.error(`Failed to find a death for ${ev.sourceID} at ${ev.timestamp} but wasn't found in charEvents`);
+                log.error(`Failed to find a death for ${ev.sourceID} at ${ev.timestamp} but wasn't found in charEvents`);
                 continue;
             }
 
@@ -1164,7 +1100,7 @@ export class IndividualReporter {
             }
 
             if (nextDeath == null) {
-                console.error(`Failed to find the next death for ${ev.sourceID} at ${ev.timestamp}`);
+                log.error(`Failed to find the next death for ${ev.sourceID} at ${ev.timestamp}`);
                 continue;
             }
 
