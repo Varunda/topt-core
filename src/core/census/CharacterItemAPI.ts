@@ -25,9 +25,9 @@ export class CharacterItemAPI {
         request.ok((data: any) => {
             const arr: CharacterItem[] = [];
             for (const elem of data.characters_item_list) {
-
+                arr.push(CharacterItemAPI.parse(elem));
             }
-
+            response.resolveOk(arr);
         });
 
         return response;
