@@ -5,6 +5,7 @@ import { OutfitAPI, Outfit } from "./census/OutfitAPI";
 import { CharacterAPI, Character } from "./census/CharacterAPI";
 
 import { TrackedPlayer } from "./TrackedPlayer";
+import { BaseExchange } from "./objects/BaseExchange";
 
 import { FacilityCapture, TimeTracking, TrackedRouter } from "./InvididualGenerator";
 
@@ -84,7 +85,9 @@ export class Core {
     public characters: Character[] = [];
     public miscEvents: TEvent[] = [];
     public playerCaptures: (TCaptureEvent | TDefendEvent)[] = [];
-    public facilityCaptures: FacilityCapture[] = [];
+    //public facilityCaptures: FacilityCapture[] = [];
+
+    public captures: BaseExchange[] = [];
 
     public rawData: any[] = [];
 

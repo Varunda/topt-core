@@ -16,6 +16,8 @@ export * from "./census/PsLoadout";
 export * from "./census/VehicleAPI";
 export * from "./census/WeaponAPI";
 
+export * from "./Playback";
+
 export * from "./events/index";
 
 export * from "./reports/OutfitReport";

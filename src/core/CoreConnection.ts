@@ -66,22 +66,21 @@ declare module "./Core" {
 };
 
 Core.prototype.onSocketError = function(socketName: string, ev: Error): void {
-    log.error(`Error on socket: ${socketName}> ${ev}`);
+    log.error(`Error on socket: ${socketName}> ${JSON.stringify(ev)}`);
 }
 
 function setupTrackerSocket(core: Core): ApiResponse {
     const response: ApiResponse = new ApiResponse();
 
     core.sockets.tracked = new w3cwebsocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${core.serviceID}`);
-    core.sockets.tracked.onopen = () => {
-
-    };
+    core.sockets.tracked.onopen = () => {};
     core.sockets.tracked.onerror = () => {
         response.resolve({ code: 500, data: `` });
     };
     core.sockets.tracked.onmessage = () => {
-        response.resolveOk();
+        log.debug(`tracker socket connected`);
         core.sockets.tracked!.onmessage = core.onmessage.bind(core);
+        response.resolveOk();
     };
 
     return response;
@@ -98,10 +97,11 @@ function setupDebugSocket(core: Core): ApiResponse {
         response.resolve({ code: 500, data: `` });
     };
     core.sockets.debug.onmessage = () => {
-        response.resolveOk();
+        log.debug(`debug socket connected`);
         core.sockets.debug!.onmessage = (ev: IMessageEvent) => {
             core.debugSocketMessages.push(JSON.parse(ev.data as string));
         };
+        response.resolveOk();
     };
 
     return response;
@@ -130,6 +130,8 @@ function setupLogisticsSocket(core: Core): ApiResponse {
         };
 
         core.sockets.logistics.send(JSON.stringify(msg));
+
+        log.debug(`logistics socket connected`);
 
         response.resolveOk();
     };
@@ -164,6 +166,8 @@ function setupLoginSocket(core: Core): ApiResponse {
 
         core.sockets.logins.send(JSON.stringify(msg));
 
+        log.debug(`login socket connected`);
+
         response.resolveOk();
     };
     core.sockets.logins.onerror = (ev: Error) => core.onSocketError("login", ev);
@@ -197,6 +201,7 @@ function setupFacilitySocket(core: Core): ApiResponse {
         };
 
         core.sockets.facility.send(JSON.stringify(msg));
+        log.debug(`facility socket connected`);
 
         response.resolveOk();
     };

@@ -6,7 +6,7 @@
   "types": "build/core/index.d.ts",
   "scripts": {
     "prepare": "npm run build",
-    "test": "jest --config jestconfig.json",
+    "test": "jest --noStackTrace --config jestconfig.json --noStackTrace",
     "build": "tsc"
   },
   "author": "varunda",
@@ -25,6 +25,7 @@
   "dependencies": {
     "axios": "^0.21.0",
     "loglevel": "^1.7.0",
+    "loglevel-plugin-prefix": "^0.8.4",
     "websocket": "^1.0.32"
   }
 }

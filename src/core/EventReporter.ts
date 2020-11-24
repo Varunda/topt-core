@@ -106,6 +106,19 @@ export class BaseCapture {
     public outfits: BreakdownArray = new BreakdownArray();
 }
 
+export class Streak {
+
+    /**
+     * How many instances of the event were in a streak
+     */
+    public amount: number = 0;
+
+    /**
+     * When the streak started in ms
+     */
+    public start: number = 0;
+}
+
 export function statMapToBreakdown<T>(map: StatMap,
         source: (IDs: string[]) => ApiResponse<T[]>,
         matcher: (elem: T, ID: string) => boolean,
@@ -162,6 +175,72 @@ export function defaultVehicleMapper(elem: Vehicle | undefined, ID: string): str
 }
 
 export default class EventReporter {
+
+    public static medicHealStreaks(events: TEvent[], charID: string): Streak[] {
+        let current: Streak = new Streak();
+
+        const streaks: Streak[] = [];
+
+        // Have 2453 1/3 (rounded to 2500) units of juice, decays at 0.32 per ms (320/sec), revive gives 750
+        const maxJuice: number = 2500;
+        const decayRate: number = 0.32; // per ms
+        const reviveJuice: number = 750;
+
+        let juice: number = 2500;
+        let prevRevive: number = 0;
+
+        for (const ev of events) {
+            if (ev.sourceID != charID) {
+                continue;
+            }
+
+            if (ev.type == "exp") {
+                if (ev.expID == PsEvent.heal || ev.expID == PsEvent.squadHeal) {
+                    if (current.start == 0) {
+                        current.start = ev.timestamp;
+                        log.debug(`${charID} streak started at ${ev.timestamp}`);
+                    }
+                    if (prevRevive == 0) {
+                        prevRevive = ev.timestamp;
+                    }
+                } else if (ev.expID == PsEvent.revive || ev.expID == PsEvent.squadRevive) {
+                    if (current.start == 0) {
+                        current.start = ev.timestamp;
+                        log.debug(`${charID} streak started at ${ev.timestamp}`);
+                    }
+                    if (prevRevive == 0) {
+                        prevRevive = ev.timestamp;
+                    }
+
+                    const diff: number = ev.timestamp - prevRevive;
+                    const juiceLost: number = diff * decayRate;
+
+                    log.debug(`${charID} lost ${juiceLost} juice. Had ${juice}, now have ${juice - juiceLost}`);
+
+                    juice = juice - juiceLost;
+
+                    if (juice <= 0) {
+                        current.amount = prevRevive - current.start;
+                        streaks.push(current);
+
+                        log.debug(`${charID} streak ended, went from ${current.start} and lasted ${current.amount}ms`);
+
+                        prevRevive = 0;
+                        current = new Streak();
+                        current.start = 0;
+                        current.amount = 0;
+                    }
+
+                    juice += reviveJuice;
+                    if (juice > maxJuice) {
+                        juice = maxJuice;
+                    }
+                }
+            }
+        }
+
+        return [];
+    }
 
     public static facilityCaptures(data: {captures: FacilityCapture[], players: (TCaptureEvent | TDefendEvent)[]}): ApiResponse<BaseCapture[]> {
         const response: ApiResponse<BaseCapture[]> = new ApiResponse();

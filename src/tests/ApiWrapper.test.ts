@@ -19,7 +19,7 @@ test("ApiResponse.Axios.200", () => {
     const promise: Promise<void> = new Promise<void>((resolve, reject) => {
         const response: ApiResponse = new ApiResponse(
             axios.default.request({
-                url: `https://census.daaybreakgames.com/s:asdf/get/ps2:v2`,
+                url: `https://census.daybreakgames.com/s:asdf/get/ps2:v2`,
                 validateStatus: null
             })
         )

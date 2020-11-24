@@ -19,6 +19,8 @@ import {
     TEventHandler
 } from "../events/index";
 
+import EventReporter, { Streak } from "../EventReporter";
+
 import logger from "loglevel";
 const log = logger.getLogger("WinterReportGenerator");
 
@@ -64,11 +66,13 @@ export class WinterReportGenerator {
         report.fun.push(this.longestKillStreak(parameters));
         report.fun.push(this.highestHSR(parameters));
         report.fun.push(this.getDifferentWeapons(parameters));
+
         report.fun.push(this.mostESFSKills(parameters));
         report.fun.push(this.mostLightningKills(parameters));
         report.fun.push(this.mostHarasserKills(parameters));
         report.fun.push(this.mostMBTKills(parameters));
         report.fun.push(this.mostSunderersKilled(parameters));
+
         report.fun.push(this.mostRoadkills(parameters));
         report.fun.push(this.mostUsefulRevives(parameters));
         report.fun.push(this.highestAverageLifeExpectance(parameters));
@@ -78,6 +82,9 @@ export class WinterReportGenerator {
         report.fun.push(this.mostRouterKills(parameters));
         report.fun.push(this.mostBeaconKills(parameters));
         report.fun.push(this.mostMAXKills(parameters));
+        report.fun.push(this.mostSundySpawns(parameters));
+        report.fun.push(this.mostRouterSpawns(parameters));
+        report.fun.push(this.longestHealStreak(parameters));
 
         let opsLeft: number = 
             + 1     // Knife kills
@@ -207,6 +214,19 @@ export class WinterReportGenerator {
         });
     }
 
+    private static longestHealStreak(parameters: WinterReportParameters): WinterMetric {
+        return this.value(parameters, ((player: TrackedPlayer) => {
+            const streaks: Streak[] = EventReporter.medicHealStreaks(player.events, player.characterID);
+
+            return Math.max(...streaks.map(iter => iter.amount));
+        }), {
+            name: "Longest heal streak",
+            funName: "Long time healer",
+            description: "Longest theoretical time with AOE heal",
+            entries: []
+        });
+    }
+
     private static mostConcAssists(parameters: WinterReportParameters): WinterMetric {
         return this.metric(parameters, [PsEvent.concAssist, PsEvent.squadConcAssist], {
             name: "Conced killers",
@@ -266,6 +286,24 @@ export class WinterReportGenerator {
             name: "Beacon kills",
             funName: "Bacon Fryer",
             description: "Players with the most beacon kills",
+            entries: []
+        });
+    }
+
+    public static mostRouterSpawns(parameters: WinterReportParameters): WinterMetric {
+        return this.metric(parameters, ["1410"], {
+            name: "Router spawns",
+            funName: "Network Provider",
+            description: "Players with the most router spawns",
+            entries: []
+        });
+    }
+
+    private static mostSundySpawns(parameters: WinterReportParameters): WinterMetric {
+        return this.metric(parameters, ["233"], {
+            name: "Sundy spawns",
+            funName: "Cat herder",
+            description: "Players with the most sundy spawns",
             entries: []
         });
     }

@@ -49,6 +49,7 @@ export class OutfitAPI {
         }
 
         IDs = IDs.filter(i => i.length > 0 && i != "0");
+        log.debug(`Loading outfits: [${IDs.join(", ")}]`);
 
         const outfits: Outfit[] = [];
 
@@ -58,8 +59,11 @@ export class OutfitAPI {
 
         for (let i = 0; i < IDs.length; i += sliceSize) {
             const slice: string[] = IDs.slice(i, i + sliceSize);
+            log.trace(`slice: [${slice.join(", ")}]`);
 
-            const request: ApiResponse<any> = CensusAPI.get(`/outfit/?outfit_id=${slice.join(",")}&c:resolve=leader`);
+            const url: string = `/outfit/?outfit_id=${slice.join(",")}&c:resolve=leader`;
+            const request: ApiResponse<any> = CensusAPI.get(url);
+            log.trace(`made request to: '${url}'`);
 
             request.ok((data: any) => {
                 if (data.returned == 0) {
@@ -77,6 +81,8 @@ export class OutfitAPI {
                 } else {
                     log.trace(`${slicesLeft} slices left`);
                 }
+            }).always(() => {
+                log.debug(`${request.status}`);
             });
         }
 

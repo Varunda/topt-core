@@ -343,26 +343,16 @@ declare module "./Core" {
             const outfitID: string = msg.payload.outfit_id;
             const facilityID: string = msg.payload.facility_id;
 
-            FacilityAPI.getByID(facilityID).ok((data: Facility) => {
-                log.trace(`New facility capture: ${data.name}`);
-
-                const capture: FacilityCapture = {
-                    facilityID: data.ID,
-                    zoneID: zoneID,
-                    name: data.name,
-                    typeID: data.typeID,
-                    type: data.type,
-                    timestamp: new Date(timestamp),
-                    timeHeld: Number.parseInt(msg.payload.duration_held),
-                    factionID: msg.payload.new_faction_id,
-                    outfitID: outfitID,
-                    previousFaction: msg.payload.old_faction_id,
-                };
-
-                self.facilityCaptures.push(capture);
-            }).noContent(() => {
-                log.error(`Failed to find facility ID ${facilityID}`);
+            self.captures.push({
+                facilityID: facilityID,
+                zoneID: zoneID,
+                timestamp: new Date(timestamp),
+                timeHeld: Number.parseInt(msg.payload.duration_held),
+                factionID: msg.payload.new_faction_id,
+                outfitID: outfitID,
+                previousFaction: msg.payload.old_faction_id,
             });
+
             save = true;
         } else if (event == "ItemAdded") {
             const itemID: string = msg.payload.item_id;

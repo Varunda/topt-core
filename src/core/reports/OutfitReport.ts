@@ -13,12 +13,13 @@ import {
 
 import EventReporter, { statMapToBreakdown,
     Breakdown, BreakdownArray,
+    BaseCapture,
     OutfitVersusBreakdown, ClassCollection, classCollectionNumber,
-    BreakdownTimeslot, BreakdownTrend, BreakdownWeaponType, BaseCapture, BaseCaptureOutfit
+    BreakdownTimeslot, BreakdownTrend, BreakdownWeaponType, BaseCaptureOutfit
 } from "../EventReporter";
 import {
     ExpBreakdown, FacilityCapture, IndividualReporter,
-     TimeTracking, 
+    TimeTracking, 
     ClassKdCollection, classKdCollection,
     Playtime, PlayerVersusEntry
 } from "../InvididualGenerator";
@@ -26,6 +27,8 @@ import {
 import { SquadStats }  from "../Core";
 import { TrackedPlayer } from "../TrackedPlayer";
 import { Squad } from "../squad/Squad";
+import { BaseExchange } from "../objects/BaseExchange";
+import { FacilityAPI, Facility } from "../census/FacilityAPI";
 
 import logger from "loglevel";
 const log = logger.getLogger("OutfitReport");
@@ -57,7 +60,8 @@ export class OutfitReportParameters {
     /**
      * Facility captures that will be included in the report
      */
-    public captures: FacilityCapture[] = [];
+    //public captures: FacilityCapture[] = [];
+    public captures: BaseExchange[] = [];
 
     /**
      * List of all the capture events related to players that will be included in the report
@@ -277,17 +281,6 @@ export class OutfitReportGenerator {
         const report: OutfitReport = new OutfitReport();
         report.tracking = parameters.tracking;
 
-        let filterZoneID: boolean = parameters.settings.zoneID != null;
-
-        report.facilityCaptures = parameters.captures.filter((iter: FacilityCapture) => {
-            return (filterZoneID == false || (filterZoneID == true && iter.zoneID == parameters.settings.zoneID))
-                && parameters.outfits.indexOf(iter.outfitID) > -1;
-        });
-
-        report.facilityCaptures.sort((a, b) => {
-            return a.timestamp.getTime() - b.timestamp.getTime();
-        });
-
         let opsLeft: number =
             + 1 // Facility captures
             + 1 // Weapon kills
@@ -311,6 +304,38 @@ export class OutfitReportGenerator {
             + 1 // Vehicle weapon kills
 
         const totalOps: number = opsLeft;
+
+        const facilityIDs: string[] = parameters.captures.filter(iter => parameters.outfits.indexOf(iter.outfitID) > -1)
+            .map(iter => iter.facilityID)
+            .filter((value, index, arr) => arr.indexOf(value) == index);
+
+        FacilityAPI.getByIDs(facilityIDs).ok((data: Facility[]) => {
+            for (const capture of parameters.captures) {
+                const facility: Facility | undefined = data.find(iter => iter.ID == capture.facilityID);
+                if (facility != undefined) {
+                    const cap: FacilityCapture = {
+                        facilityID: facility.ID,
+                        zoneID: capture.zoneID,
+                        name: facility.name,
+                        typeID: facility.typeID,
+                        type: facility.type,
+                        timestamp: capture.timestamp,
+                        timeHeld: capture.timeHeld,
+                        factionID: capture.facilityID,
+                        outfitID: capture.outfitID,
+                        previousFaction: capture.previousFaction
+                    };
+
+                    report.facilityCaptures.push(cap);
+                } else {
+                    log.warn(`Failed to find facility ID ${capture.facilityID}`);
+                }
+            }
+
+            report.facilityCaptures.sort((a, b) => {
+                return a.timestamp.getTime() - b.timestamp.getTime();
+            });
+        });
 
         const callback = (step: string) => {
             return () => {
