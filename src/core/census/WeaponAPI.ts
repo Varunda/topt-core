@@ -8,6 +8,9 @@ export class Weapon {
     public ID: string = "";
     public name: string = "";
     public type: string = "";
+    public factionID: string = "";
+    public imageSetID: string = "";
+    public imageID: string = "";
 }
 
 export class WeaponAPI {
@@ -40,7 +43,10 @@ export class WeaponAPI {
         return {
             ID: elem.item_id,
             name: elem.name?.en ?? `Unnamed ${elem.item_id}`,
-            type: this.maxTypeFixer(elem.category?.name.en ?? "Unknown")
+            type: this.maxTypeFixer(elem.category?.name.en ?? "Unknown"),
+            factionID: elem.faction_id,
+            imageSetID: elem.image_set_id,
+            imageID: elem.image_id
         };
     }
 
@@ -88,7 +94,7 @@ export class WeaponAPI {
             response.resolveOk(WeaponAPI._cache.get(weaponID)!);
         } else {
             const request: ApiResponse<any> = CensusAPI.get(
-                `item?item_id=${weaponID}&c:hide=description,max_stack_size,image_set_id,image_id,image_path&c:lang=en&c:join=item_category^inject_at:category`
+                `item?item_id=${weaponID}&c:hide=description,max_stack_size,image_path&c:lang=en&c:join=item_category^inject_at:category`
             );
 
             WeaponAPI._pendingRequests.set(weaponID, response);
