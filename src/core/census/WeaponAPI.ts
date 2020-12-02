@@ -139,7 +139,7 @@ export class WeaponAPI {
 
         if (requestIDs.length > 0) {
             const request: ApiResponse<any> = CensusAPI.get(
-                `item?item_id=${requestIDs.join(",")}&c:hide=description,max_stack_size,image_set_id,image_id,image_path&c:lang=en&c:join=item_category^inject_at:category`
+                `item?item_id=${requestIDs.join(",")}&c:hide=description,max_stack_size,image_path&c:lang=en&c:join=item_category^inject_at:category`
             );
 
             request.ok((data: any) => {

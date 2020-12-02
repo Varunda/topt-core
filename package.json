@@ -7,7 +7,8 @@
   "scripts": {
     "prepare": "npm run build",
     "test": "jest --noStackTrace --config jestconfig.json --noStackTrace",
-    "build": "tsc"
+    "build": "tsc --listEmittedFiles",
+    "watch": "tsc --watch"
   },
   "author": "varunda",
   "license": "MIT",

@@ -298,6 +298,8 @@ declare module "./Core" {
 
             self.playerCaptures.push(ev);
 
+            console.log(`${playerID} helped with capture of ${facilityID}`);
+
             let player = self.stats.get(playerID);
             if (player != undefined) {
                 player.stats.increment(PsEvent.baseCapture);

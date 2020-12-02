@@ -235,13 +235,6 @@ export class BreakdownSingle {
     public showTotal: boolean = true;
 }
 
-export class EventFeedEntry {
-    public type: "kill" | "death" | "revived" | "revive" | "capture" | "unknown" = "unknown";
-    public text: string = "";
-    public timestamp: Date = new Date();
-    public effects: EventFeedEntry[] = [];
-}
-
 export class ReportParameters {
 
     /**

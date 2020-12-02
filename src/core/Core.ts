@@ -184,6 +184,8 @@ export class Core {
         this.stats.forEach((char: TrackedPlayer, charID: string) => {
             char.joinTime = nowMs;
         });
+
+        log.debug(`Started core`);
     }
 
     /**

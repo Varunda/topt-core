@@ -2,6 +2,9 @@ import { ApiResponse } from "./ApiWrapper";
 
 import * as axios from "axios";
 
+import logger from "loglevel";
+const log = logger.getLogger("CensusAPI");
+
 export default class CensusAPI {
 
     public static serviceID: string = "";
@@ -14,6 +17,7 @@ export default class CensusAPI {
 
     public static init(serviceID: string): void {
         CensusAPI.serviceID = serviceID;
+        log.debug(`Initalizied CensusAPI with serviceID`);
     }
 
     public static getType<T>(url: string, reader: ((elem: any) => T)): ApiResponse<T> {

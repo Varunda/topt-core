@@ -21,6 +21,7 @@ import { OutfitAPI, Outfit } from "./census/OutfitAPI";
 
 import logger from "loglevel";
 const log = logger.getLogger("EventReporter");
+log.enableAll();
 
 export class BreakdownArray {
     data: Breakdown[] = [];
@@ -210,36 +211,42 @@ export default class EventReporter {
                     }
                     if (prevRevive == 0) {
                         prevRevive = ev.timestamp;
+                        log.debug(`${charID} set prevRevive to ${ev.timestamp}`);
                     }
 
                     const diff: number = ev.timestamp - prevRevive;
                     const juiceLost: number = diff * decayRate;
+                    prevRevive = ev.timestamp;
 
-                    log.debug(`${charID} lost ${juiceLost} juice. Had ${juice}, now have ${juice - juiceLost}`);
+                    log.debug(`${charID} lost ${juiceLost} juice over ${diff}ms (${ev.timestamp} - ${prevRevive}). Had ${juice}, now have ${juice - juiceLost}`);
 
                     juice = juice - juiceLost;
 
                     if (juice <= 0) {
-                        current.amount = prevRevive - current.start;
+                        const overtime: number = (ev.timestamp - current.start) / 1000;
+                        const otherJuice: number = juice / (decayRate * 1000);
+                        current.amount = overtime + otherJuice;
                         streaks.push(current);
 
-                        log.debug(`${charID} streak ended, went from ${current.start} and lasted ${current.amount}ms`);
+                        log.debug(`${charID} streak ended, overtime: ${overtime}, otherJuice: ${otherJuice} went from ${current.start} to ${ev.timestamp} and lasted ${current.amount}ms`);
 
                         prevRevive = 0;
                         current = new Streak();
-                        current.start = 0;
+                        current.start = 0; //ev.timestamp;
                         current.amount = 0;
+                        juice = maxJuice;
                     }
 
                     juice += reviveJuice;
                     if (juice > maxJuice) {
                         juice = maxJuice;
                     }
+
                 }
             }
         }
 
-        return [];
+        return streaks;
     }
 
     public static facilityCaptures(data: {captures: FacilityCapture[], players: (TCaptureEvent | TDefendEvent)[]}): ApiResponse<BaseCapture[]> {

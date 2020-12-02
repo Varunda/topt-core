@@ -25,7 +25,7 @@
         "strictPropertyInitialization": true,
         "strictFunctionTypes": true,
         "strictBindCallApply": true,
-        "noEmitOnError": true
+        "noEmitOnError": false
     },
     "include": [
         "./src/**/*"
