@@ -177,7 +177,7 @@ export function defaultVehicleMapper(elem: Vehicle | undefined, ID: string): str
 
 export default class EventReporter {
 
-        public static medicHealStreaks(events: TEvent[], charID: string): Streak[] {
+    public static medicHealStreaks(events: TEvent[], charID: string): Streak[] {
         let current: Streak = new Streak();
 
         const streaks: Streak[] = [];
