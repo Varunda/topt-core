@@ -204,7 +204,7 @@ export default class EventReporter {
                     if (prevRevive == 0) {
                         prevRevive = ev.timestamp;
                     }
-                } else if (ev.expID == PsEvent.revive || ev.expID == PsEvent.squadRevive || ev.expID == PsEvent.kill) {
+                } else if (ev.expID == PsEvent.revive || ev.expID == PsEvent.squadRevive || ev.type == "kill") {
                     if (current.start == 0) {
                         current.start = ev.timestamp;
                         log.debug(`${charID} streak started at ${ev.timestamp}`);
