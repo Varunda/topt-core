@@ -177,7 +177,7 @@ export function defaultVehicleMapper(elem: Vehicle | undefined, ID: string): str
 
 export default class EventReporter {
 
-    public static medicHealStreaks(events: TEvent[], charID: string): Streak[] {
+        public static medicHealStreaks(events: TEvent[], charID: string): Streak[] {
         let current: Streak = new Streak();
 
         const streaks: Streak[] = [];
@@ -214,35 +214,33 @@ export default class EventReporter {
                         log.debug(`${charID} set prevRevive to ${ev.timestamp}`);
                     }
 
-                    const diff: number = ev.timestamp - prevRevive;
-                    const juiceLost: number = diff * decayRate;
-                    prevRevive = ev.timestamp;
-
-                    log.debug(`${charID} lost ${juiceLost} juice over ${diff}ms (${ev.timestamp} - ${prevRevive}). Had ${juice}, now have ${juice - juiceLost}`);
-
-                    juice = juice - juiceLost;
-
-                    if (juice <= 0) {
-                        const overtime: number = (ev.timestamp - current.start) / 1000;
-                        const otherJuice: number = juice / (decayRate * 1000);
-                        current.amount = overtime + otherJuice;
-                        streaks.push(current);
-
-                        log.debug(`${charID} streak ended, overtime: ${overtime}, otherJuice: ${otherJuice} went from ${current.start} to ${ev.timestamp} and lasted ${current.amount}ms`);
-
-                        prevRevive = 0;
-                        current = new Streak();
-                        current.start = 0; //ev.timestamp;
-                        current.amount = 0;
-                        juice = maxJuice;
-                    }
-
                     juice += reviveJuice;
                     if (juice > maxJuice) {
                         juice = maxJuice;
                     }
-
                 }
+            }
+            const diff: number = ev.timestamp - prevRevive;
+            const juiceLost: number = diff * decayRate;
+            prevRevive = ev.timestamp;
+
+            log.debug(`${charID} lost ${juiceLost} juice over ${diff}ms (${ev.timestamp} - ${prevRevive}). Had ${juice}, now have ${juice - juiceLost}`);
+
+            juice = juice - juiceLost;
+            
+            if (juice <= 0) {
+                const overtime: number = (ev.timestamp - current.start) / 1000;
+                const otherJuice: number = juice / (decayRate * 1000);
+                current.amount = overtime + otherJuice;
+                streaks.push(current);
+
+                log.debug(`${charID} streak ended, overtime: ${overtime}, otherJuice: ${otherJuice} went from ${current.start} to ${ev.timestamp} and lasted ${current.amount}ms`);
+
+                prevRevive = 0;
+                current = new Streak();
+                current.start = 0; //ev.timestamp;
+                current.amount = 0;
+                juice = maxJuice;
             }
         }
 
