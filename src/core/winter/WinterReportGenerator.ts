@@ -23,6 +23,7 @@ import EventReporter, { Streak } from "../EventReporter";
 
 import logger from "loglevel";
 const log = logger.getLogger("WinterReportGenerator");
+log.enableAll();
 
 export class WinterMetricIndex {
     public static KILLS: number = 0;
@@ -215,16 +216,35 @@ export class WinterReportGenerator {
     }
 
     private static longestHealStreak(parameters: WinterReportParameters): WinterMetric {
-        return this.value(parameters, ((player: TrackedPlayer) => {
-            const streaks: Streak[] = EventReporter.medicHealStreaks(player.events, player.characterID);
+        return this.value(
+            parameters,
+            ((player: TrackedPlayer) => {
+                const streaks: Streak[] = EventReporter.medicHealStreaks(player.events, player.characterID);
+                if (streaks.length == 0) { return 0; }
 
-            return Math.max(...streaks.map(iter => iter.amount));
-        }), {
-            name: "Longest heal streak",
-            funName: "Long time healer",
-            description: "Longest theoretical time with AOE heal",
-            entries: []
-        });
+                let max: number = 0;
+                let maxStreak: Streak = streaks[0]; // Will always have one, length check above
+                for (const streak of streaks) {
+                    if (streak.amount > max) {
+                        max = streak.amount;
+                        maxStreak = streak;
+                    }
+                }
+
+                log.debug(`Longest heal streak of ${player.name} started ${maxStreak.start} for ${maxStreak.amount} seconds`);
+
+                return maxStreak.amount;
+            }),
+            {
+                name: "Longest heal streak",
+                funName: "Long time healer",
+                description: "Longest theoretical time with AOE heal, assuming combat surgeon 5",
+                entries: []
+            },
+            ((display: number) => {
+                return `${display.toFixed(2)} seconds`;
+            })
+        );
     }
 
     private static mostConcAssists(parameters: WinterReportParameters): WinterMetric {

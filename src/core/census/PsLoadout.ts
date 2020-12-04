@@ -17,6 +17,29 @@ export class PsLoadout {
         singleName: "D",
         type: "unknown"
     };
+
+    /**
+     * Get the type of loadout a loadoutID is
+     * 
+     * @param loadoutID ID of the loadout to get the type of
+     */
+    public static getLoadoutType(loadoutID: string): PsLoadoutType {
+        // NC / TR / VS / NS
+        if (loadoutID == "1" || loadoutID == "8" || loadoutID == "15" || loadoutID == "28") {
+            return "infil";
+        } else if (loadoutID == "3" || loadoutID == "10" || loadoutID == "17" || loadoutID == "29") {
+            return "lightAssault";
+        } else if (loadoutID == "4" || loadoutID == "11" || loadoutID == "18" || loadoutID == "30") {
+            return "medic";
+        } else if (loadoutID == "5" || loadoutID == "12" || loadoutID == "19" || loadoutID == "31") {
+            return "engineer";
+        } else if (loadoutID == "6" || loadoutID == "13" || loadoutID == "20" || loadoutID == "32") {
+            return "heavy";
+        } else if (loadoutID == "7" || loadoutID == "14" || loadoutID == "21" || loadoutID == "33") {
+            return "medic";
+        }
+        return "unknown";
+    }
 }
 
 export const PsLoadouts: Map<string, PsLoadout> = new Map<string, PsLoadout>([

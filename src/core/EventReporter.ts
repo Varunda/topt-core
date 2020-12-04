@@ -195,8 +195,8 @@ export default class EventReporter {
                 continue;
             }
 
-            if (ev.type == "exp") {
-                if (ev.expID == PsEvent.heal || ev.expID == PsEvent.squadHeal) {
+            if (ev.type == "exp" || ev.type == "kill") {
+                if (ev.type == "exp" && (ev.expID == PsEvent.heal || ev.expID == PsEvent.squadHeal)) {
                     if (current.start == 0) {
                         current.start = ev.timestamp;
                         log.debug(`${charID} streak started at ${ev.timestamp}`);
@@ -204,16 +204,24 @@ export default class EventReporter {
                     if (prevRevive == 0) {
                         prevRevive = ev.timestamp;
                     }
-                } else if (ev.expID == PsEvent.revive || ev.expID == PsEvent.squadRevive) {
+                } else if (PsLoadout.getLoadoutType(ev.loadoutID) == "medic"
+                    && (ev.type == "kill" || ev.expID == PsEvent.revive || ev.expID == PsEvent.squadRevive)) {
+
                     if (current.start == 0) {
                         current.start = ev.timestamp;
                         log.debug(`${charID} streak started at ${ev.timestamp}`);
                     }
                     if (prevRevive == 0) {
                         prevRevive = ev.timestamp;
-                        log.debug(`${charID} set prevRevive to ${ev.timestamp}`);
                     }
 
+                    juice += reviveJuice;
+                    if (juice > maxJuice) {
+                        juice = maxJuice;
+                    }
+                }
+
+                if (current.start != 0) {
                     const diff: number = ev.timestamp - prevRevive;
                     const juiceLost: number = diff * decayRate;
                     prevRevive = ev.timestamp;
@@ -237,12 +245,8 @@ export default class EventReporter {
                         juice = maxJuice;
                     }
 
-                    juice += reviveJuice;
-                    if (juice > maxJuice) {
-                        juice = maxJuice;
-                    }
-
                 }
+
             }
         }
 
@@ -274,9 +278,6 @@ export default class EventReporter {
                 entry.timestamp = capture.timestamp.getTime();
                 entry.name = capture.name;
                 entry.faction = capture.previousFaction;
-
-                const facilityID: string = capture.facilityID;
-                const name: string = capture.name;
 
                 const outfitID: string = capture.outfitID;
                 const outfit: Outfit | undefined = data.find(iter => iter.ID == outfitID);
