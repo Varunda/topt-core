@@ -7,42 +7,52 @@ import { PsEvent, PsEvents } from "./PsEvent";
 import { Squad } from "./squad/Squad";
 import { SquadMember } from "./squad/SquadMember";
 
-import logger from "loglevel";
-const log = logger.getLogger("Core.Squad");
+import { Logger } from "./Loggers";
+const log = Logger.getLogger("Core.Squad");
 
 declare module "./Core" {
 
     export interface Core {
 
+        /**
+         * Start up method called during the ctor, I'm not sure what would happen when it's called twice
+         */
         squadInit(): void
 
         /**
-         * Get a specific squad 
+         * Get a specific squad by it's name
          * 
          * @param squadName Squad name to get
          */
-        getSquad(squadName: string): Squad | null
+        getSquad(squadName: string): Squad | null;
+
+        /**
+         * Get a specific squad by it's ID
+         * 
+         * @param squadID Squad ID to get
+         */
+        getSquadByID(squadID: number): Squad | null;
 
         /**
          * Get the squad a member is in
          * 
          * @param charID Character ID of the member to get the squad of
          */
-        getSquadOfMember(charID: string): Squad | null
+        getSquadOfMember(charID: string): Squad | null;
 
         /**
          * Process a kill or death event and update the tracked squads
          * 
          * @param event Event to process
          */
-        processKillDeathEvent(event: TKillEvent | TDeathEvent): void
+        processKillDeathEvent(event: TKillEvent | TDeathEvent): void;
 
         /**
          * Process an experience event and update the tracked squads
          * 
          * @param event Experience event to process
          */
-        processExperienceEvent(event: TExpEvent): void
+        processExperienceEvent(event: TExpEvent): void;
 
         /**
          * Merge one squad into another squad, moving all members
@@ -50,7 +60,7 @@ declare module "./Core" {
          * @param mergeInto Name of the squad being merged into
          * @param mergeFrom Name of the squad that the members will be moved out of
          */
-        mergeSquads(mergeInto: Squad, mergeFrom: Squad): void
+        mergeSquads(mergeInto: Squad, mergeFrom: Squad): void;
 
         /**
          * Begin tracking a new character in the squad
@@ -78,12 +88,13 @@ declare module "./Core" {
 
         /**
          * Character ID of the member to add to a squad, removing the character
-         * from old squads if needed
+         *      from old squads if needed. Either a squad name or squad ID can be passed,
+         *      using a squad ID will be more consistent, but sometimes a squad ID isn't available
          * 
          * @param charID Character ID of the member to move into a squad
-         * @param squadName Name of the squad to move the member into
+         * @param squadRef ID or name of the squad to move the member into
          */
-        addMemberToSquad(charID: string, squadName: string): void
+        addMemberToSquad(charID: string, squadRef: string | number): void;
 
         /**
          * Remove a member from the squad they are currently in,
@@ -91,7 +102,19 @@ declare module "./Core" {
          * 
          * @param charID Character ID of the character to move out of the squad
          */
-        removeMember(charID: string): void
+        removeMemberFromSquad(charID: string): void;
+
+        /**
+         * Mark a member as offline, for example when they log out
+         * 
+         * @param charID Character ID to mark as offline
+         */
+        removeMember(charID: string): void;
+
+        /**
+         * Print debug information about squads
+         */
+        printSquadInfo(): void;
 
     }
 }
@@ -125,17 +148,21 @@ Core.prototype.squadInit = function(): void {
     this.createPermSquad();
     this.createPermSquad();
 
+    // Every second update the death timer and beacon cooldown if needed
     setInterval(() => {
         const time: number = new Date().getTime();
         this.squad.members.forEach((member: SquadMember, charID: string) => {
+
+            // If they've died update their dying timer
             if (member.state == "dying" && member.whenDied != null) {
-                member.timeDead = (time - member.whenDied) / 1000;
+                member.timeDead = (time - member.whenDied) / 1000; // ms to seconds
 
                 if (member.timeDead > 29) {
-                    member.state = "dead";
+                    member.state = "dead"; // They've been dead too long
                 }
             }
 
+            // If they've placed a beacon update the timer
             if (member.whenBeacon) {
                 member.beaconCooldown = (time - member.whenBeacon) / 1000;
 
@@ -145,17 +172,24 @@ Core.prototype.squadInit = function(): void {
                 }
             }
         });
-
     }, 1000);
 }
 
+/**
+ * Sort the names in a squad, by online status, then name
+ * 
+ * @param squad Squad to sort the members of
+ */
 function sortSquad(squad: Squad): void {
     squad.members.sort((a, b) => {
         if (b.online == false && a.online == false) {
             return a.name.localeCompare(b.name);
         }
-        if (b.online == false || a.online == false) {
+        if (b.online == false && a.online == true) {
             return -1;
+        }
+        if (b.online == true && a.online == false) {
+            return 1;
         }
         return a.name.localeCompare(b.name);
     });
@@ -264,7 +298,6 @@ const validRespawnEvent = (ev: TExpEvent, whenDied: number | null): boolean => {
 }
 
 Core.prototype.processExperienceEvent = function(event: TExpEvent): void {
-
     if (event.expID == PsEvent.revive || event.expID == PsEvent.squadRevive) {
         if (this.squad.members.has(event.targetID)) {
             const member: SquadMember = this.squad.members.get(event.targetID)!;
@@ -395,19 +428,28 @@ Core.prototype.getSquad = function(squadName: string): Squad | null {
     return this.squad.guesses.find(iter => iter.name == squadName) || null;
 }
 
-Core.prototype.addMemberToSquad = function(charID: string, squadName: string): void {
-    const member: SquadMember | undefined = this.squad.members.get(charID);
-    if (member == undefined) {
-        return log.warn(`Cannot move ${charID} to ${squadName}: ${charID} is not a squad member`);
+Core.prototype.getSquadByID = function(squadID: number): Squad | null {
+    let squad: Squad | null = this.squad.perm.find(iter => iter.ID == squadID) || null;
+    if (squad != null) {
+        return squad;
     }
 
-    const squad: Squad | null = this.getSquad(squadName);
+    return this.squad.guesses.find(iter => iter.ID == squadID) || null;
+}
+
+Core.prototype.addMemberToSquad = function(charID: string, squadRef: string | number): void {
+    const member: SquadMember | undefined = this.squad.members.get(charID);
+    if (member == undefined) {
+        return log.warn(`Cannot move ${charID} to ${squadRef}: ${charID} is not a squad member`);
+    }
+
+    const squad: Squad | null = (typeof(squadRef) == "string") ? this.getSquad(squadRef) : this.getSquadByID(squadRef);
     if (squad == null) {
-        return log.warn(`Cannot move ${charID} to ${squadName}: squad ${squadName} does not exist`);
+        return log.warn(`Cannot move ${charID} to ${squadRef}: squad ${squadRef} does not exist`);
     }
 
     if (squad.members.find(iter => iter.charID == charID) != null) {
-        return log.debug(`${charID} is already part of squad ${squadName}, no need to move`);
+        return log.debug(`${charID} is already part of squad ${squadRef}, no need to move`);
     }
 
     const oldSquad: Squad | null = this.getSquadOfMember(charID);
@@ -440,6 +482,8 @@ Core.prototype.getSquadOfMember = function(charID: string): Squad | null {
             return squad;
         }
     }
+
+    log.debug(`Failed to find a squad for ${charID}`);
 
     return null;
 }
@@ -482,7 +526,7 @@ Core.prototype.createPermSquad = function(): Squad {
     squad.guess = false;
     squad.display = permSquadNames[(this.squad.perm.length % permSquadNames.length)];
 
-    log.trace(`Created new perm squad ${squad.name}/${squad.display}`);
+    log.debug(`Created new perm squad ${squad.name}/${squad.display}`);
 
     this.squad.perm.push(squad);
 
@@ -505,8 +549,27 @@ Core.prototype.removePermSquad = function(squadName: string): void {
     this.squad.perm = this.squad.perm.filter(iter => iter.name != squadName);
 }
 
+Core.prototype.removeMemberFromSquad = function(charID: string): void {
+    log.debug(`Remove ${charID} from their current squad into a new one`);
+
+    const member: SquadMember | undefined = this.squad.members.get(charID);
+    if (member == undefined) {
+        log.warn(`Cannot remove ${charID} from their current squad, they are not tracked`);
+        return;
+    }
+
+    const squad: Squad | null = this.getSquadOfMember(charID);
+    if (squad == null) {
+        log.warn(`Failed to find the squad that ${charID} is in`);
+        return;
+    }
+
+    const newSquad: Squad = this.createGuessSquad();
+    this.addMemberToSquad(charID, newSquad.ID);
+}
+
 Core.prototype.removeMember = function(charID: string): void {
-    log.trace(`${charID} is offline`);
+    log.debug(`${charID} went offline`);
 
     if (this.squad.members.has(charID)) {
         const char: SquadMember = this.squad.members.get(charID)!
@@ -514,5 +577,26 @@ Core.prototype.removeMember = function(charID: string): void {
         char.state = "alive";
         char.whenDied = null;
         char.timeDead = 0;
+    }
+}
+
+Core.prototype.printSquadInfo = function(): void {
+    log.info(`Perm squads:`);
+    for (const squad of this.squad.perm) {
+        log.info(`\t${squad}`);
+    }
+
+    log.info(`Guess squads:`);
+    for (const squad of this.squad.guesses) {
+        log.info(`\t${squad}`);
+    }
+
+    log.info(`Members:`);
+    for (const entry of this.squad.members) {
+        const charID: string = entry[0];
+        const member: SquadMember = entry[1];
+        const squad: Squad | null = this.getSquadOfMember(charID);
+
+        log.info(`\t${member.name}/${member.charID} is in ${squad?.name}/${squad?.ID} ${squad == null ? "Missing squad" : ""}`);
     }
 }

@@ -1,5 +1,5 @@
 import { TimeTracking } from "../InvididualGenerator";
-import { TrackedPlayer } from "../TrackedPlayer";
+import { TrackedPlayer } from "../Objects/TrackedPlayer";
 
 import { TEvent } from "../events/index";
 

@@ -1,7 +1,7 @@
 import { Core } from "./Core";
 
-import logger from "loglevel";
-const log = logger.getLogger("Core.Debug");
+import { Logger } from "./Loggers";
+const log = Logger.getLogger("Core.Debug");
 
 declare module "./Core" {
 
@@ -21,6 +21,11 @@ declare module "./Core" {
          */
         subscribeToEvent(...expID: string[]): void;
 
+        /**
+         * Subscribe to and exp event on all servers, not just the current server
+         * 
+         * @param expID Rest parameter of the exp IDs to listen to
+         */
         subscribeToAllEvent(...expID: string[]): void;
 
         /**

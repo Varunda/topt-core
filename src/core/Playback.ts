@@ -5,8 +5,8 @@ import { OutfitAPI, Outfit } from "./census/OutfitAPI";
 import { Character } from "./census/CharacterAPI";
 import { ApiResponse } from "./census/ApiWrapper";
 
-import logger from "loglevel";
-const log = logger.getLogger("Playback");
+import { Logger } from "./Loggers";
+const log = Logger.getLogger("Playback");
 
 export class PlaybackOptions {
 

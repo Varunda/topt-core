@@ -16,6 +16,8 @@ export * from "./census/PsLoadout";
 export * from "./census/VehicleAPI";
 export * from "./census/WeaponAPI";
 
+export * from "./objects/index";
+
 export * from "./Playback";
 
 export * from "./events/index";
@@ -31,6 +33,7 @@ export * from "./EventReporter";
 export * from "./InvididualGenerator";
 export * from "./PsEvent";
 export * from "./StatMap";
-export * from "./TrackedPlayer";
 
 export * from "./winter/index";
+
+export * from "./Loggers";

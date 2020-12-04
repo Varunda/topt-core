@@ -1,8 +1,8 @@
 import CensusAPI from "./CensusAPI";
 import { ApiResponse } from "./ApiWrapper";
 
-import logger from "loglevel";
-const log = logger.getLogger("FacilityAPI");
+import { Logger } from "../Loggers";
+const log = Logger.getLogger("FacilityAPI");
 
 export class Facility {
     public ID: string = "";

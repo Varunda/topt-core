@@ -4,8 +4,8 @@ import { ApiResponse } from "./census/ApiWrapper";
 
 import { w3cwebsocket, IMessageEvent } from "websocket";
 
-import logger from "loglevel";
-const log = logger.getLogger("Core:Connection");
+import { Logger } from "./Loggers";
+const log = Logger.getLogger("Core:Connection");
 
 declare module "./Core" {
 
@@ -14,7 +14,7 @@ declare module "./Core" {
         /**
          * Connect to the event stream
          * 
-         * @returns Returns a Loading that contains the current state of progress
+         * @returns An ApiResponse that will resolve once the core is connected to Census
          */
         connect(): ApiResponse;
 
@@ -23,6 +23,12 @@ declare module "./Core" {
          */
         disconnect(): void;
 
+        /**
+         * Callback set on sockets when they throw an error
+         * 
+         * @param socketName Name of the socket that threw the error
+         * @param ev Event containing more information
+         */
         onSocketError(socketName: string, ev: Error): void;
 
     }
@@ -42,13 +48,19 @@ declare module "./Core" {
         + 1 // Facilities
         + 1 // Debug
 
-    setupTrackerSocket(self).always(() => { if (--opsLeft == 0) { response.resolveOk(); } });
-    setupLoginSocket(self).always(() => { if (--opsLeft == 0) { response.resolveOk(); }});
-    setupLogisticsSocket(self).always(() => { if (--opsLeft == 0) { response.resolveOk(); }});
-    setupFacilitySocket(self).always(() => { if (--opsLeft == 0) { response.resolveOk(); }});
-    setupDebugSocket(self).always(() => { if (--opsLeft == 0) { response.resolveOk(); }});
+    // Common handler used when all sockets have connected
+    const handler = () => {
+        if (--opsLeft == 0) {
+            self.connected = true;
+            response.resolveOk();
+        }
+    }
 
-    self.connected = true;
+    setupTrackerSocket(self).always(() => { handler(); });
+    setupLoginSocket(self).always(() => { handler(); });
+    setupLogisticsSocket(self).always(() => { handler(); });
+    setupFacilitySocket(self).always(() => { handler(); });
+    setupDebugSocket(self).always(() => { handler(); });
 
     return response;
 };
@@ -90,9 +102,7 @@ function setupDebugSocket(core: Core): ApiResponse {
     const response: ApiResponse = new ApiResponse();
 
     core.sockets.debug = new w3cwebsocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${core.serviceID}`);
-    core.sockets.debug.onopen = () => {
-
-    };
+    core.sockets.debug.onopen = () => { };
     core.sockets.debug.onerror = () => {
         response.resolve({ code: 500, data: `` });
     };

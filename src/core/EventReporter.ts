@@ -16,12 +16,11 @@ import {
 } from "./events/index";
 
 import { IndividualReporter, TimeTracking, Playtime, FacilityCapture } from "./InvididualGenerator";
-import { TrackedPlayer } from "./TrackedPlayer";
+import { TrackedPlayer } from "./Objects/TrackedPlayer";
 import { OutfitAPI, Outfit } from "./census/OutfitAPI";
 
-import logger from "loglevel";
-const log = logger.getLogger("EventReporter");
-log.enableAll();
+import { Logger } from "./Loggers";
+const log = Logger.getLogger("EventReporter");
 
 export class BreakdownArray {
     data: Breakdown[] = [];
@@ -118,6 +117,7 @@ export class Streak {
      * When the streak started in ms
      */
     public start: number = 0;
+
 }
 
 export function statMapToBreakdown<T>(map: StatMap,

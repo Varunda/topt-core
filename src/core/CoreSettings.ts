@@ -1,4 +1,7 @@
 
+/**
+ * Collection of settings used in core
+ */
 export class CoreSettings {
 
     /**

@@ -2,8 +2,8 @@ import CensusAPI from "./CensusAPI";
 import { ApiResponse } from "./ApiWrapper";
 import { CharacterAPI, Character } from "./CharacterAPI";
 
-import logger from "loglevel";
-const log = logger.getLogger("OutfitAPI");
+import { Logger } from "../Loggers";
+const log = Logger.getLogger("OutfitAPI");
 
 export class Outfit {
     ID: string = "";

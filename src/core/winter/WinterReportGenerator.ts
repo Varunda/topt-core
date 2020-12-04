@@ -6,7 +6,7 @@ import { WinterReportParameters } from "./WinterReportParameters";
 
 import StatMap from "../StatMap";
 import { PsEvent } from "../PsEvent";
-import { TrackedPlayer } from "../TrackedPlayer";
+import { TrackedPlayer } from "../Objects/TrackedPlayer";
 import { Vehicles } from "../census/VehicleAPI";
 import { WeaponAPI, Weapon } from "../census/WeaponAPI";
 import { PsLoadout, PsLoadouts } from "../census/PsLoadout";
@@ -21,9 +21,8 @@ import {
 
 import EventReporter, { Streak } from "../EventReporter";
 
-import logger from "loglevel";
-const log = logger.getLogger("WinterReportGenerator");
-log.enableAll();
+import { Logger } from "../Loggers";
+const log = Logger.getLogger("WinterReportGenerator");
 
 export class WinterMetricIndex {
     public static KILLS: number = 0;

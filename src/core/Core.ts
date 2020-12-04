@@ -4,8 +4,7 @@ import CensusAPI from "./census/CensusAPI";
 import { OutfitAPI, Outfit } from "./census/OutfitAPI";
 import { CharacterAPI, Character } from "./census/CharacterAPI";
 
-import { TrackedPlayer } from "./TrackedPlayer";
-import { BaseExchange } from "./objects/BaseExchange";
+import { TrackedPlayer, BaseExchange } from "./Objects/index";
 
 import { FacilityCapture, TimeTracking, TrackedRouter } from "./InvididualGenerator";
 
@@ -22,33 +21,17 @@ import { SquadMember } from "./squad/SquadMember"
 
 import { w3cwebsocket, IMessageEvent } from "websocket";
 
-import logger from "loglevel";
-const log = logger.getLogger("Core");
+import { Logger } from "./Loggers";
+const log = Logger.getLogger("Core");
 
-export class SquadStats {
-
-    public name: string = "";
-
-    public members: string[] = [];
-
-    public kills: number = 0;
-
-    public deaths: number = 0;
-
-    public revives: number = 0;
-
-    public heals: number = 0;
-
-    public resupplies: number = 0;
-
-    public repairs: number = 0;
-
-    public vKills: number = 0;
-
-}
-
+/**
+ * Core class that manages all tracking, sockets, event processing, etc.
+ */
 export class Core {
 
+    /**
+     * Collection of sockets used for tracking
+     */
     public sockets = {
         tracked: null as w3cwebsocket | null,
         logistics: null as w3cwebsocket | null,
@@ -57,6 +40,9 @@ export class Core {
         debug: null as w3cwebsocket | null
     };
 
+    /**
+     * Collection of variables used to track router placements
+     */
     public routerTracking = {
         // key - Who placed the router
         // value - Lastest npc ID that gave them a router spawn tick
@@ -65,6 +51,9 @@ export class Core {
         routers: [] as TrackedRouter[] // All routers that have been placed
     };
 
+    /**
+     * Collection of squad related vars
+     */
     public squad = {
         debug: false as boolean,
 
@@ -74,25 +63,70 @@ export class Core {
         members: new Map() as Map<string, SquadMember>,
     };
 
+    /**
+     * Queue of messages to prevent duplicate messages from being processed
+     */
     public socketMessageQueue: string[] = [];
+    
+    /**
+     * All messages collected in the debug socket
+     */
     public debugSocketMessages: string[] = [];
 
+    /**
+     * service ID used to connect to Census
+     */
     public serviceID: string;
+
+    /**
+     * ID of the server that server-wide tracking will be done on
+     */
     public serverID: string;
 
+    /**
+     * Collection of players who are being tracked, with the key being the character ID,
+     *      and value being where player specific stats are stored
+     */
     public stats: Map<string, TrackedPlayer> = new Map<string, TrackedPlayer>();
-    public outfits: Outfit[] = [];
-    public characters: Character[] = [];
-    public miscEvents: TEvent[] = [];
-    public playerCaptures: (TCaptureEvent | TDefendEvent)[] = [];
-    //public facilityCaptures: FacilityCapture[] = [];
 
+    /**
+     * List of outfits being tracked
+     */
+    public outfits: Outfit[] = [];
+
+    /**
+     * List of characters being tracked
+     */
+    public characters: Character[] = [];
+
+    /**
+     * Misc events that are needed for processing, but are not attached to a single player, such as a FacilityCapture
+     */
+    public miscEvents: TEvent[] = [];
+
+    /**
+     * List of PlayerFacilityCapture and PlayerFacilityDefend events, including those who are not tracked
+     */
+    public playerCaptures: (TCaptureEvent | TDefendEvent)[] = [];
+
+    /**
+     * List of all base captures that have occure
+     */
     public captures: BaseExchange[] = [];
 
+    /**
+     * List of all events in raw unprocessed form, used to export data
+     */
     public rawData: any[] = [];
 
+    /**
+     * Tracking tracking
+     */
     public tracking: TimeTracking = new TimeTracking();
 
+    /**
+     * If core is corrently connected to Census or not
+     */
     public connected: boolean = false;
 
     public constructor(serviceID: string, serverID: string) {
@@ -106,6 +140,9 @@ export class Core {
         this.squadInit();
     }
 
+    /**
+     * Event handlers that can be added onto
+     */
     public handlers = {
         exp: [] as TEventHandler<"exp">[],
         kill: [] as TEventHandler<"kill">[],
@@ -170,7 +207,7 @@ export class Core {
     }
 
     /**
-     * Start the tracking and begin saving events
+     * Start the tracking and begin saving events, the core must be connected for this to work
      */
     public start(): void {
         if (this.connected == false) {
@@ -185,7 +222,7 @@ export class Core {
             char.joinTime = nowMs;
         });
 
-        log.debug(`Started core`);
+        log.info(`Started core`);
     }
 
     /**
@@ -221,11 +258,11 @@ export class Core {
     }
 
     /**
-     * Begin tracking all members of an outfit
+     * Begin tracking all members of an outfit. The core must be connected before this is called
      * 
      * @param tag Tag of the outfit to track. Case-insensitive
      * 
-     * @returns A Loading that will contain the state of 
+     * @returns An ApiResponse that will resolve when the outfit has been loaded
      */
     public addOutfit(tag: string): ApiResponse {
         if (this.connected == false) {
@@ -252,7 +289,7 @@ export class Core {
     }
 
     /**
-     * Begin tracking a new player
+     * Begin tracking a new player. The core must be connected before calling
      * 
      * @param name Name of the player to track. Case-insensitive
      * 
@@ -277,7 +314,7 @@ export class Core {
     }
 
     /**
-     * Subscribe to the events in the event stream
+     * Subscribe to the events in the event stream and begin tracking them in the squad tracker
      * 
      * @param chars Characters to subscribe to
      */
@@ -306,7 +343,7 @@ export class Core {
             player.faction = character.faction;
             player.outfitTag = character.outfitTag;
             player.name = character.name;
-            if (character.online == true) {
+            if (character.online == true) { // Begin squad tracking if they're online
                 player.joinTime = new Date().getTime();
                 this.addMember({ ID: player.characterID, name: player.name, outfitTag: character.outfitTag });
             }
@@ -338,6 +375,11 @@ export class Core {
         }
     }
 
+    /**
+     * Method called when a socket receives a new message
+     * 
+     * @param ev Event from a websocket
+     */
     public onmessage(ev: IMessageEvent): void {
         for (const message of this.socketMessageQueue) {
             if (ev.data == message) {

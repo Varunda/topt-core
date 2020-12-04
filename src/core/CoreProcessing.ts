@@ -1,15 +1,14 @@
 import { Core } from "./Core";
 
-import { PsLoadout, PsLoadouts } from "./census/PsLoadout";
 import { PsEventType, PsEvent, PsEvents } from "./PsEvent";
 
+import { PsLoadout, PsLoadouts } from "./census/PsLoadout";
 import { Weapon, WeaponAPI } from "./census/WeaponAPI";
-import { FacilityAPI, Facility } from "./census/FacilityAPI";
 import { CharacterAPI, Character } from "./census/CharacterAPI";
 
 import { FacilityCapture, TrackedRouter } from "./InvididualGenerator";
 
-import { TrackedPlayer } from "./TrackedPlayer";
+import { TrackedPlayer } from "./Objects/TrackedPlayer";
 
 import {
     TEvent, TEventType,
@@ -19,8 +18,8 @@ import {
     TEventHandler
 } from "./events/index";
 
-import logger from "loglevel";
-const log = logger.getLogger("Core.Processing");
+import { Logger } from "./Loggers";
+const log = Logger.getLogger("Core.Processing");
 
 declare module "./Core" {
 
@@ -225,7 +224,9 @@ declare module "./Core" {
                 targetTicks.events.push(ev);
                 targetTicks.recentDeath = ev;
 
-                WeaponAPI.precache(ev.weaponID);
+                if (self.tracking.running == true) {
+                    WeaponAPI.precache(ev.weaponID);
+                }
 
                 self.emit(ev);
                 self.processKillDeathEvent(ev);
@@ -297,8 +298,6 @@ declare module "./Core" {
             };
 
             self.playerCaptures.push(ev);
-
-            console.log(`${playerID} helped with capture of ${facilityID}`);
 
             let player = self.stats.get(playerID);
             if (player != undefined) {

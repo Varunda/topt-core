@@ -21,10 +21,10 @@ import {
     TEventHandler
 } from "./events/index";
 
-import { TrackedPlayer } from "./TrackedPlayer";
+import { TrackedPlayer } from "./Objects/TrackedPlayer";
 
-import logger from "loglevel";
-const log = logger.getLogger("IndividualGenerator");
+import { Logger } from "./Loggers";
+const log = Logger.getLogger("IndividualGenerator");
 
 export class ClassBreakdown {
     secondsAs: number = 0;

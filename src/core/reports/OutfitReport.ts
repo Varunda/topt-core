@@ -24,14 +24,14 @@ import {
     Playtime, PlayerVersusEntry
 } from "../InvididualGenerator";
 
-import { SquadStats }  from "../Core";
-import { TrackedPlayer } from "../TrackedPlayer";
+import { SquadStat }  from "../Objects/index";
+import { TrackedPlayer } from "../Objects/TrackedPlayer";
 import { Squad } from "../squad/Squad";
 import { BaseExchange } from "../objects/BaseExchange";
 import { FacilityAPI, Facility } from "../census/FacilityAPI";
 
-import logger from "loglevel";
-const log = logger.getLogger("OutfitReport");
+import { Logger } from "../Loggers";
+const log = Logger.getLogger("OutfitReport");
 
 export class OutfitReportSettings {
 
@@ -202,8 +202,8 @@ export class OutfitReport {
     };
 
     public squadStats = {
-        data: [] as SquadStats[],
-        all: new SquadStats() as SquadStats
+        data: [] as SquadStat[],
+        all: new SquadStat() as SquadStat
     };
 
     weaponKillBreakdown: BreakdownArray = new BreakdownArray();
@@ -540,7 +540,7 @@ export class OutfitReportGenerator {
         EventReporter.vehicleKills(report.events).ok(data => report.vehicleKillBreakdown = data).always(callback("Vehicle type kills"));
         EventReporter.vehicleWeaponKills(report.events).ok(data => report.vehicleKillWeaponBreakdown = data).always(callback("Vehicle weapon kills"));
 
-        const getSquadStats: (squad: Squad, name: string) => SquadStats = (squad: Squad, name: string) => {
+        const getSquadStats: (squad: Squad, name: string) => SquadStat = (squad: Squad, name: string) => {
             const squadIDs: string[] = squad.members.map(iter => iter.charID);
 
             return {

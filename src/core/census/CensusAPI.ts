@@ -2,8 +2,8 @@ import { ApiResponse } from "./ApiWrapper";
 
 import * as axios from "axios";
 
-import logger from "loglevel";
-const log = logger.getLogger("CensusAPI");
+import { Logger } from "../Loggers";
+const log = Logger.getLogger("CensusAPI");
 
 export default class CensusAPI {
 
