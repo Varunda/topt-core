@@ -24,8 +24,7 @@ import {
     Playtime, PlayerVersusEntry
 } from "../InvididualGenerator";
 
-import { SquadStat }  from "../Objects/index";
-import { TrackedPlayer } from "../Objects/TrackedPlayer";
+import { SquadStat, TrackedPlayer }  from "../objects/index";
 import { Squad } from "../squad/Squad";
 import { BaseExchange } from "../objects/BaseExchange";
 import { FacilityAPI, Facility } from "../census/FacilityAPI";
@@ -281,28 +280,31 @@ export class OutfitReportGenerator {
         const report: OutfitReport = new OutfitReport();
         report.tracking = parameters.tracking;
 
-        let opsLeft: number =
-            + 1 // Facility captures
-            + 1 // Weapon kills
-            + 1 // Weapon type kills
-            + 1 // Teamkills
-            + 1 // Faction kills
-            + 1 // Faction deaths
-            + 1 // Cont kills
-            + 1 // Cont deaths
-            + 1 // All weapon deaths
-            + 1 // Unrevived weapon deaths
-            + 1 // Revived weapon deaths
-            + 1 // All weapon type deaths
-            + 1 // Unrevived weapon type deaths
-            + 1 // Revived weapon type deaths
-            + 1 // Weapon death breakdown
-            + 6 // Weapon kill types for all classes
-            + 6 // Weapon death types for all classes
-            + 1 // Outfit VS KD
-            + 1 // Vehicle kills
-            + 1 // Vehicle weapon kills
+        response.addStep("Facility captures")
+            .addStep("Weapon kills")
+            .addStep("Weapon type kills")
+            .addStep("Teamkills")
+            .addStep("Faction kills")
+            .addStep("Faction deaths")
+            .addStep("Continent kills")
+            .addStep("Continent deaths")
+            .addStep("All weapon deaths")
+            .addStep("Unrevived weapon deaths")
+            .addStep("Revived weapon deaths")
+            .addStep("All weapon type deaths")
+            .addStep("Unrevived weapon type deaths")
+            .addStep("Revived weapon type deaths")
+            .addStep("Weapon death breakdown")
+            .addStep("Outfit KD")
+            .addStep("Vehicle kills")
+            .addStep("Vehicle weapon kills")
 
+        for (const clazz of ["Infil", "LA", "Medic", "Engineer", "Heavy", "MAX"]) {
+            response.addStep(`Weapon type kills for ${clazz}`);
+            response.addStep(`Weapon type deaths for ${clazz}`);
+        }
+
+        let opsLeft: number = response.getSteps().length;
         const totalOps: number = opsLeft;
 
         const facilityIDs: string[] = parameters.captures.filter(iter => parameters.outfits.indexOf(iter.outfitID) > -1)
@@ -310,7 +312,15 @@ export class OutfitReportGenerator {
             .filter((value, index, arr) => arr.indexOf(value) == index);
 
         FacilityAPI.getByIDs(facilityIDs).ok((data: Facility[]) => {
+            log.debug(`Got these facilities when loaded: [${facilityIDs.join(", ")}]:\n${JSON.stringify(data)}`);
+
+            let missing: string[] = [];
+
             for (const capture of parameters.captures) {
+                if (parameters.outfits.indexOf(capture.outfitID) == -1) {
+                    continue;
+                }
+
                 const facility: Facility | undefined = data.find(iter => iter.ID == capture.facilityID);
                 if (facility != undefined) {
                     const cap: FacilityCapture = {
@@ -321,35 +331,39 @@ export class OutfitReportGenerator {
                         type: facility.type,
                         timestamp: capture.timestamp,
                         timeHeld: capture.timeHeld,
-                        factionID: capture.facilityID,
+                        factionID: capture.factionID,
                         outfitID: capture.outfitID,
                         previousFaction: capture.previousFaction
                     };
 
                     report.facilityCaptures.push(cap);
                 } else {
-                    log.warn(`Failed to find facility ID ${capture.facilityID}`);
+                    if (missing.indexOf(capture.facilityID) == -1) {
+                        log.warn(`Failed to find facility ID ${capture.facilityID}`);
+                        missing.push(capture.facilityID);
+                    }
                 }
             }
 
             report.facilityCaptures.sort((a, b) => {
                 return a.timestamp.getTime() - b.timestamp.getTime();
             });
+
+            EventReporter.facilityCaptures({
+                captures: report.facilityCaptures,
+                players: parameters.playerCaptures
+            }).ok(data => report.baseCaptures = data).always(callback("Facility captures"));
         });
 
         const callback = (step: string) => {
             return () => {
                 log.debug(`Finished ${step}: Have ${opsLeft - 1} ops left outta ${totalOps}`);
+                response.finishStep(step);
                 if (--opsLeft == 0) {
                     response.resolveOk(report);
                 }
             }
         }
-
-        EventReporter.facilityCaptures({
-            captures: report.facilityCaptures,
-            players: parameters.playerCaptures
-        }).ok(data => report.baseCaptures = data).always(callback("Facility captures"));
 
         const chars: TrackedPlayer[] = Array.from(parameters.players.values());
 
@@ -475,8 +489,8 @@ export class OutfitReportGenerator {
         EventReporter.factionKills(report.events).ok(data => report.factionKillBreakdown = data).always(callback("Faction kills"));
         EventReporter.factionDeaths(report.events).ok(data => report.factionDeathBreakdown = data).always(callback("Faction deaths"));
 
-        EventReporter.continentKills(report.events).ok(data => report.continentKillBreakdown = data).always(callback("Cont kills"));
-        EventReporter.continentDeaths(report.events).ok(data => report.continentDeathBreakdown = data).always(callback("Cont deaths"));
+        EventReporter.continentKills(report.events).ok(data => report.continentKillBreakdown = data).always(callback("Continent kills"));
+        EventReporter.continentDeaths(report.events).ok(data => report.continentDeathBreakdown = data).always(callback("Continent deaths"));
 
         EventReporter.weaponDeaths(report.events).ok(data => report.deathAllBreakdown = data).always(callback("All weapon deaths"));
         EventReporter.weaponDeaths(report.events, true).ok(data => report.deathRevivedBreakdown = data).always(callback("Revived weapon deaths"));
@@ -502,30 +516,30 @@ export class OutfitReportGenerator {
         };
 
         EventReporter.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["1", "8", "15"])))
-            .ok(data => report.classTypeKills.infil = data).always(callback("Weapon type kills: Infil"));
+            .ok(data => report.classTypeKills.infil = data).always(callback("Weapon type kills for Infil"));
         EventReporter.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["3", "10", "17"])))
-            .ok(data => report.classTypeKills.lightAssault = data).always(callback("Weapon type kills: LA"));
+            .ok(data => report.classTypeKills.lightAssault = data).always(callback("Weapon type kills for LA"));
         EventReporter.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["4", "11", "18"])))
-            .ok(data => report.classTypeKills.medic = data).always(callback("Weapon type kills: Medic"));
+            .ok(data => report.classTypeKills.medic = data).always(callback("Weapon type kills for Medic"));
         EventReporter.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["5", "12", "19"])))
-            .ok(data => report.classTypeKills.engineer = data).always(callback("Weapon type kills: Eng"));
+            .ok(data => report.classTypeKills.engineer = data).always(callback("Weapon type kills for Engineer"));
         EventReporter.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["6", "13", "20"])))
-            .ok(data => report.classTypeKills.heavy = data).always(callback("Weapon type kills: Heavy"));
+            .ok(data => report.classTypeKills.heavy = data).always(callback("Weapon type kills for Heavy"));
         EventReporter.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["7", "14", "21"])))
-            .ok(data => report.classTypeKills.max = data).always(callback("Weapon type kills: MAX"));
+            .ok(data => report.classTypeKills.max = data).always(callback("Weapon type kills for MAX"));
 
         EventReporter.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["1", "8", "15"])))
-            .ok(data => report.classTypeDeaths.infil = data).always(callback("Weapon type deaths: Infil"));
+            .ok(data => report.classTypeDeaths.infil = data).always(callback("Weapon type deaths for Infil"));
         EventReporter.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["3", "10", "17"])))
-            .ok(data => report.classTypeDeaths.lightAssault = data).always(callback("Weapon type deaths: LA"));
+            .ok(data => report.classTypeDeaths.lightAssault = data).always(callback("Weapon type deaths for LA"));
         EventReporter.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["4", "11", "18"])))
-            .ok(data => report.classTypeDeaths.medic = data).always(callback("Weapon type deaths: Medic"));
+            .ok(data => report.classTypeDeaths.medic = data).always(callback("Weapon type deaths for Medic"));
         EventReporter.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["5", "12", "19"])))
-            .ok(data => report.classTypeDeaths.engineer = data).always(callback("Weapon type deaths: Eng"));
+            .ok(data => report.classTypeDeaths.engineer = data).always(callback("Weapon type deaths for Engineer"));
         EventReporter.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["6", "13", "20"])))
-            .ok(data => report.classTypeDeaths.heavy = data).always(callback("Weapon type deaths: Heavy"));
+            .ok(data => report.classTypeDeaths.heavy = data).always(callback("Weapon type deaths for Heavy"));
         EventReporter.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["7", "14", "21"])))
-            .ok(data => report.classTypeDeaths.max = data).always(callback("Weapon type deaths: MAX"));
+            .ok(data => report.classTypeDeaths.max = data).always(callback("Weapon type deaths for MAX"));
 
         report.classKds.infil = IndividualReporter.classVersusKd(report.events, "infil");
         report.classKds.lightAssault = IndividualReporter.classVersusKd(report.events, "lightAssault");
@@ -535,9 +549,9 @@ export class OutfitReportGenerator {
         report.classKds.max = IndividualReporter.classVersusKd(report.events, "max");
         report.classKds.total = IndividualReporter.classVersusKd(report.events);
 
-        EventReporter.outfitVersusBreakdown(report.events).ok(data => report.outfitVersusBreakdown = data).always(callback("Outfit VS KD"));
+        EventReporter.outfitVersusBreakdown(report.events).ok(data => report.outfitVersusBreakdown = data).always(callback("Outfit KD"));
 
-        EventReporter.vehicleKills(report.events).ok(data => report.vehicleKillBreakdown = data).always(callback("Vehicle type kills"));
+        EventReporter.vehicleKills(report.events).ok(data => report.vehicleKillBreakdown = data).always(callback("Vehicle kills"));
         EventReporter.vehicleWeaponKills(report.events).ok(data => report.vehicleKillWeaponBreakdown = data).always(callback("Vehicle weapon kills"));
 
         const getSquadStats: (squad: Squad, name: string) => SquadStat = (squad: Squad, name: string) => {

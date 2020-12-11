@@ -350,8 +350,37 @@ Core.prototype.processExperienceEvent = function(event: TExpEvent): void {
     const sourceMember: SquadMember | undefined = this.squad.members.get(event.sourceID);
     const targetMember: SquadMember | undefined = this.squad.members.get(event.targetID);
 
-    if (sourceMember == undefined || targetMember == undefined) {
+    // There are events that happen where no one is tracked
+    if (sourceMember == undefined && targetMember == undefined) { return; }
+
+    if (this.squad.autoadd == false && (sourceMember == undefined || targetMember == undefined)) {
         return;
+    }
+
+    if (this.squad.autoadd == true) {
+        if (squadEvents.indexOf(event.trueExpID) > -1) {
+            if (sourceMember == undefined && targetMember != undefined) {
+                log.info(`${event.sourceID} is not tracked, adding them to the tracker from ${JSON.stringify(event)}`);
+                this.addPlayerByID(event.sourceID).ok(() => {
+                    this.processExperienceEvent(event);
+                });
+            }
+            if (sourceMember != undefined && targetMember == undefined) {
+                log.info(`${event.targetID} is not tracked, adding them to the tracker from ${JSON.stringify(event)}`);
+                this.addPlayerByID(event.targetID).ok(() => {
+                    this.processExperienceEvent(event);
+                });
+            }
+            return;
+        }
+    }
+
+    if (this.squad.autoadd == true && (sourceMember == undefined || targetMember == undefined)) {
+        log.warn(`Not sure how we got here`);
+        return;
+    }
+    if (sourceMember == undefined || targetMember == undefined) {
+        throw `Bad logic above ^^^`;
     }
 
     let sourceSquad: Squad | null = this.getSquadOfMember(event.sourceID);

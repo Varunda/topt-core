@@ -21,7 +21,7 @@ import {
     TEventHandler
 } from "./events/index";
 
-import { TrackedPlayer } from "./Objects/TrackedPlayer";
+import { TrackedPlayer } from "./objects/TrackedPlayer";
 
 import { Logger } from "./Loggers";
 const log = Logger.getLogger("IndividualGenerator");

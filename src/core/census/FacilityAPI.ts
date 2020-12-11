@@ -112,9 +112,7 @@ export class FacilityAPI {
         for (const facID of IDs) {
             if (FacilityAPI._cache.has(facID)) {
                 const fac = FacilityAPI._cache.get(facID)!;
-                if (fac != null) {
-                    facilities.push(fac);
-                }
+                facilities.push(fac);
             } else {
                 requestIDs.push(facID);
             }
@@ -122,7 +120,7 @@ export class FacilityAPI {
 
         if (requestIDs.length > 0) {
             const request: ApiResponse<any> = CensusAPI.get(
-                `/map_region?facility_id=${requestIDs.join(",")}`
+                `/map_region?facility_id=${requestIDs.join(",")}&c:limit=100`
             );
 
             request.ok((data: any) => {

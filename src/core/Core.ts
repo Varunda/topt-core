@@ -4,7 +4,7 @@ import CensusAPI from "./census/CensusAPI";
 import { OutfitAPI, Outfit } from "./census/OutfitAPI";
 import { CharacterAPI, Character } from "./census/CharacterAPI";
 
-import { TrackedPlayer, BaseExchange } from "./Objects/index";
+import { TrackedPlayer, BaseExchange } from "./objects/index";
 
 import { FacilityCapture, TimeTracking, TrackedRouter } from "./InvididualGenerator";
 
@@ -55,12 +55,13 @@ export class Core {
      * Collection of squad related vars
      */
     public squad = {
-        debug: false as boolean,
+        debug: false as boolean, // Debug flag to print and include more info
+        autoadd: false as boolean, // Auto add people to the tracker when they're found in the squad
 
-        perm: [] as Squad[],
-        guesses: [] as Squad[],
+        perm: [] as Squad[], // Permanent squads that will always exist, alpha, bravo, etc.
+        guesses: [] as Squad[], // The possible squads that are being put together
 
-        members: new Map() as Map<string, SquadMember>,
+        members: new Map() as Map<string, SquadMember>, // Members being tracked in squads
     };
 
     /**
@@ -293,7 +294,7 @@ export class Core {
      * 
      * @param name Name of the player to track. Case-insensitive
      * 
-     * @returns A loading that will contain the state of
+     * @returns An ApiResponse that will resolve when the character has been loaded and tracked
      */
     public addPlayer(name: string): ApiResponse {
         if (this.connected == false) {
@@ -307,10 +308,40 @@ export class Core {
         } else {
             CharacterAPI.getByName(name).ok((data: Character) => {
                 this.subscribeToEvents([data]);
+                response.resolveOk();
             });
         }
 
         return response;
+    }
+
+    /**
+     * Being tracking a character by the character ID. Core must be connected before calling
+     * 
+     * @param charID Character ID of the player to begin tracking
+     * 
+     * @returns An ApiResponse that will resolve when the character has been loaded and tracked
+     */
+    public addPlayerByID(charID: string): ApiResponse {
+        if (this.connected == false) {
+            throw `Cannot tracker character ${charID}: Core is not connected`;
+        }
+
+        const response: ApiResponse = new ApiResponse();
+
+        if (charID.trim().length == 0) {
+            response.resolveOk();
+        } else {
+            CharacterAPI.getByID(charID).ok((data: Character) => {
+                this.subscribeToEvents([data]);
+                response.resolveOk();
+            }).notFound((err: string) => {
+                response.resolve({ code: 500, data: `Character ID ${charID} does not exist` });
+            });
+        }
+
+        return response;
+
     }
 
     /**

@@ -7,6 +7,7 @@ import { ApiResponse } from "./census/ApiWrapper";
 
 import { Logger } from "./Loggers";
 const log = Logger.getLogger("Playback");
+log.enableAll();
 
 export class PlaybackOptions {
 
@@ -93,6 +94,7 @@ export class Playback {
 
                 OutfitAPI.getByIDs(outfitIDs).ok((data: Outfit[]) => {
                     this._core!.outfits = data;
+                    log.info(`From [${outfitIDs.join(", ")}] loaded: ${JSON.stringify(data)}`);
                 }).always(() => {
                     response.resolveOk();
                 });

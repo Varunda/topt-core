@@ -1,4 +1,5 @@
 import * as axios from "axios";
+import log = require("loglevel");
 
 export type ResponseContent<T> =
     { code: 200, data: T } // OK
@@ -27,6 +28,8 @@ export type ResponseCodes = 200 | 201 | 204 | 400 | 401 | 403 | 404 | 413 | 500 
 
 type ApiResponseCallback = (data: any) => void;
 
+export type StepState = "done" | "working" | "errored";
+
 // Default to void as undefined is assignable to void. Would prefer to use never, but there is
 // no default value for never, and never cannot be assigned
 /**
@@ -54,9 +57,7 @@ export class ApiResponse<T = void> {
      * Callbacks to call when specific status code response is resolved from the API call.
      * If no callbacks are defined for a status code an exception is thrown
      */
-    private _callbacks: Map<number, ApiResponseCallback[]> = new Map([
-
-    ]);
+    private _callbacks: Map<number, ApiResponseCallback[]> = new Map([ ]);
 
     /**
      * Has this API response already been resolved? If so, any additional callbacks added after the
@@ -65,6 +66,8 @@ export class ApiResponse<T = void> {
     private _resolved: boolean = false;
 
     public isResolved(): boolean { return this._resolved; }
+
+    public _steps: Map<string, StepState> | null = null;
 
     /**
      * Statically resolve an ApiResponse, similar to how Promise.resolve works. This is useful when creating
@@ -120,66 +123,6 @@ export class ApiResponse<T = void> {
         }).catch((error: any) => {
             throw `Don't expect this: ${error}`;
         });
-
-        /*
-        // JQuery uses data and jq differently depending on if the request is rejected (status code 404/500)
-        // or accepted (anything but a 404/500), so that's pretty neat :^)
-        responseData.always((data: any, state: string, jq: any) => {
-            let localStatus: number = 0;
-            let localData: T | null | number | string = null;
-            let localUrl: string = "";
-            let localMethod: string = "";
-
-            if (state == "success") { // data is the object, jq is the JQueryXHR
-                if (jq.status === undefined) { throw `Failed to get the status from jq`; }
-                localStatus = Number(jq.status);
-                localUrl = jq.url;
-                localMethod = jq.method;
-
-                if (reader != null && jq.status == 200) {
-                    if (data.error != undefined || data.errorCode != undefined || data == "") {
-                        localStatus = 500;
-                        localData = data;
-                    } else {
-                        localData = reader(data);
-                    }
-                } else {
-                    localData = data;
-                }
-            } else if (state == "error") { // data is the JQueryXHR, jq is the status code string
-                if (data.status === undefined || data.responseText === undefined) {
-                    throw `Invalid data ${data}`;
-                }
-
-                localStatus = Number(data.status);
-                localData = String(data.responseText);
-                localUrl = data.url;
-                localMethod = data.method;
-            } else if (state == "nocontent") {
-                localStatus = 204;
-                localData = null;
-                localUrl = jq.url;
-                localMethod = jq.method;
-            } else {
-                debugger;
-                throw `Unhandled state ${state}`;
-            }
-
-            // TODO: Get rid of this any
-            // I need to figure out a way to remove this any. Because the type of each element in codes is
-            //      a ResponseCode, not a number, and localStatus is a number, TS assumes that this can't be possible,
-            //      when in fact it is
-            if (ApiResponse.codes.indexOf(localStatus as any) == -1) {
-                throw `Unhandle status code: ${localStatus}`;
-            }
-
-            // TODO: AHHHH, it's an any!
-            // I need to find a better way to do this. Because the type of data is not known, Typescript rightly
-            //      assumes that code could be 204 and data is a string, which doesn't meet the requirements of a
-            //      ResponseContent. Maybe use a switch on localStatus?
-            this.resolve({ code: localStatus as ResponseCodes, data: localData } as any);
-        });
-        */
     }
 
     /**
@@ -211,7 +154,68 @@ export class ApiResponse<T = void> {
      * @param data Data to resolve this response with
      */
     public resolveOk(data: T): void {
+        if (this._steps != null) {
+            const steps: string[] = this.getSteps();
+            let notDone: string[] = [];
+
+            for (const step of steps) {
+                if (this.getStepState(step) != "done") {
+                    notDone.push(step);
+                }
+            }
+
+            if (notDone.length > 0) {
+                log.warn(`The following steps are not done: [${notDone.join(", ")}]`);
+            }
+        }
         this.resolve({ code: 200, data: data });
+    }
+
+    public addStep(step: string): this {
+        if (this._steps == null) {
+            this._steps = new Map<string, StepState>();
+        }
+
+        if (this._steps.has(step)) {
+            log.warn(`Duplicate step '${step}' in ApiResponse. Current steps: ${Array.from(this._steps.keys()).join(", ")}`);
+        }
+
+        this._steps.set(step, "working");
+
+        return this;
+    }
+
+    public updateStep(step: string, state: StepState): void {
+        if (this._steps == null) {
+            log.warn(`Cannot update setp '${step}' to ${state}: No steps have been created`);
+            return;
+        }
+
+        if (!this._steps.has(step)) {
+            log.warn(`Cannot update step '${step}' to ${state}: Step not found`);
+        }
+
+        this._steps.set(step, state);
+    }
+
+    public finishStep(step: string): void {
+        this.updateStep(step, "done");
+    }
+
+    public getSteps(): string[] {
+        if (this._steps == null) {
+            throw `No steps defined. Cannot get steps`;
+        }
+
+        return Array.from(this._steps.keys());
+    }
+
+    public getStepState(step: string): StepState | null {
+        if (this._steps == null) {
+            throw `Not steps defined. Cannot get step state`;
+        }
+
+        return this._steps.get(step) || null;
     }
 
     /**

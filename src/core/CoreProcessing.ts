@@ -249,7 +249,7 @@ declare module "./Core" {
                         weaponID: msg.payload.attacker_weapon_id,
                         zoneID: zoneID,
                         timestamp: timestamp
-                    }
+                    };
 
                     sourceTicks.events.push(ev);
 

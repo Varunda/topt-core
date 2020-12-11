@@ -21,6 +21,7 @@ import { OutfitAPI, Outfit } from "./census/OutfitAPI";
 
 import { Logger } from "./Loggers";
 const log = Logger.getLogger("EventReporter");
+log.enableAll();
 
 export class BreakdownArray {
     data: Breakdown[] = [];
@@ -261,16 +262,20 @@ export default class EventReporter {
         const captures: FacilityCapture[] = data.captures;
         const players: (TCaptureEvent | TDefendEvent)[] = data.players;
 
-        const outfitIDs: string[] = players
-            .map(iter => iter.outfitID)
-            .filter((value, index, arr) => arr.indexOf(value) == index);
-
         log.debug(`Have ${data.captures.length} captures`);
 
+        const outfitIDs: string[] = players.map(iter => iter.outfitID)
+            .filter((value, index, arr) => arr.indexOf(value) == index);
+
+        log.debug(`Getting these outfits: [${outfitIDs.join(", ")}]`);
+
         OutfitAPI.getByIDs(outfitIDs).ok((data: Outfit[]) => {
+            log.debug(`Loaded ${data.length}/${outfitIDs.length}. Processing ${captures.length} captures`);
             for (const capture of captures) {
                 // Same faction caps are boring
+                log.debug(`processing ${JSON.stringify(capture)}`);
                 if (capture.factionID == capture.previousFaction) {
+                    log.debug(`Skipping capture: ${JSON.stringify(capture)}`);
                     continue;
                 }
 
