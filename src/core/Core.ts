@@ -13,7 +13,8 @@ import {
     TExpEvent, TKillEvent, TDeathEvent, TTeamkillEvent,
     TCaptureEvent, TDefendEvent,
     TVehicleKillEvent,
-    TEventHandler
+    TEventHandler,
+    TMarkerEvent
 } from "./events/index";
 
 import { Squad } from "./squad/Squad";
@@ -153,7 +154,8 @@ export class Core {
         defend: [] as TEventHandler<"defend">[],
         vehicle: [] as TEventHandler<"vehicle">[],
         login: [] as TEventHandler<"login">[],
-        logout: [] as TEventHandler<"logout">[]
+        logout: [] as TEventHandler<"logout">[],
+        marker: [] as TEventHandler<"marker">[]
     };
 
     /**
@@ -182,6 +184,7 @@ export class Core {
             case "vehicle": this.handlers.vehicle.push(handler as TEventHandler<"vehicle">); break;
             case "login": this.handlers.login.push(handler as TEventHandler<"login">); break;
             case "logout": this.handlers.logout.push(handler as TEventHandler<"logout">); break;
+            case "marker": this.handlers.marker.push(handler as TEventHandler<"marker">); break;
             default: throw `Unchecked event type ${type}`;
         }
     }
@@ -202,6 +205,7 @@ export class Core {
             this.handlers.vehicle.length = 0;
             this.handlers.login.length = 0;
             this.handlers.logout.length = 0;
+            this.handlers.marker.length = 0;
         } else {
             this.handlers[type].length = 0;
         }
@@ -341,7 +345,35 @@ export class Core {
         }
 
         return response;
+    }
 
+    /**
+     * Insert a new marker event at the current time. Calling this while the tracker is not running can be dangerous as it 
+     *      modifies the event collection
+     * 
+     * @param mark Mark to be made
+     */
+    public addMarker(mark: string): void {
+        if (this.tracking.running == false) {
+            log.warn(`A new marker for ${mark} is being added, adding a marker while not running is not recommended`);
+        }
+
+        const ev: TMarkerEvent = {
+            type: "marker",
+            sourceID: "7103",
+            timestamp: new Date().getTime(),
+            mark: mark
+        };
+
+        this.rawData.push(JSON.stringify({
+            payload: ev,
+            service: "event",
+            type: "toptMarker"
+        }));
+
+        this.miscEvents.push(ev);
+
+        this.emit(ev);
     }
 
     /**

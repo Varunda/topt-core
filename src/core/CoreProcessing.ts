@@ -15,7 +15,8 @@ import {
     TExpEvent, TKillEvent, TDeathEvent, TTeamkillEvent,
     TCaptureEvent, TDefendEvent,
     TVehicleKillEvent, TLoginEvent, TLogoutEvent,
-    TEventHandler
+    TEventHandler,
+    TMarkerEvent
 } from "./events/index";
 
 import { Logger } from "./Loggers";
@@ -468,6 +469,16 @@ declare module "./Core" {
         log.trace(`connectionStateChanged event`);
     } else if (msg.type == undefined) {
         // Occurs in response to subscribing to new events
+    } else if (msg.type == "toptMarker") {
+        // These events are special because they will only be encountered during playback, not during
+        //      traacking, as these are manually added by an outside source
+
+        log.info(`Processed a toptMarker event: ${JSON.stringify(msg)}`);
+
+        const ev: TMarkerEvent = msg.payload;
+        self.miscEvents.push(ev);
+
+        save = true;
     } else {
         log.warn(`Unchecked message type: '${msg.type}'`);
     }

@@ -23,6 +23,7 @@ export * from "./Playback";
 export * from "./events/index";
 
 export * from "./reports/OutfitReport";
+export * from "./reports/FightReport";
 
 export * from "./squad/Squad";
 export * from "./squad/SquadMember";

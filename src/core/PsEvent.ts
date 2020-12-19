@@ -74,10 +74,14 @@ export class PsEvent {
     public static squadEmpAssist: string = "553";
     public static flashAssist: string = "554";
     public static squadFlashAssist: string = "555";
+
     public static savior: string = "335";
     public static ribbon: string = "291";
     public static routerKill: string = "1409";
     public static beaconKill: string = "270";
+
+    public static controlPointAttack: string = "16";
+    public static controlPointDefend: string = "15";
 
 }
 

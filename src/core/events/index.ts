@@ -9,6 +9,7 @@ import { TDefendEvent } from "./TDefendEvent";
 import { TVehicleKillEvent } from "./TVehicleKillEvent";
 import { TLoginEvent } from "./TLoginEvent";
 import { TLogoutEvent } from "./TLogoutEvent";
+import { TMarkerEvent } from "./TMarkerEvent";
 
 import { TEventHandler } from "./TEventHandlers";
 
@@ -18,5 +19,6 @@ export {
     TCaptureEvent, TDefendEvent,
     TVehicleKillEvent,
     TLoginEvent, TLogoutEvent,
+    TMarkerEvent,
     TEventHandler
 }

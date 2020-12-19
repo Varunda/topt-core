@@ -36,12 +36,12 @@ export class Playback {
         const response: ApiResponse = new ApiResponse();
 
         if (typeof(file) == "string") {
-            log.trace(`using a string`);
+            log.debug(`using a string`);
             this.process(file).ok(() => {
                 response.resolveOk();
             });
         } else {
-            log.trace(`using a file`);
+            log.debug(`using a file`);
             const reader: FileReader = new FileReader();
 
             reader.onload = ((ev: ProgressEvent<FileReader>) => {

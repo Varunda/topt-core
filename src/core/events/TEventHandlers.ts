@@ -7,6 +7,7 @@ import { TDefendEvent } from "./TDefendEvent";
 import { TVehicleKillEvent } from "./TVehicleKillEvent";
 import { TLoginEvent } from "./TLoginEvent";
 import { TLogoutEvent } from "./TLogoutEvent";
+import { TMarkerEvent } from "./TMarkerEvent";
 
 export type TEventHandler<T extends TEventType>
     = T extends "kill" ? (ev: TKillEvent) => void
@@ -17,4 +18,5 @@ export type TEventHandler<T extends TEventType>
     : T extends "vehicle" ? (ev: TVehicleKillEvent) => void
     : T extends "login" ? (ev: TLoginEvent) => void
     : T extends "logout" ? (ev: TLogoutEvent) => void
+    : T extends "marker" ? (ev: TMarkerEvent) => void
     : never;

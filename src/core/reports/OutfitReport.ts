@@ -307,6 +307,16 @@ export class OutfitReportGenerator {
         let opsLeft: number = response.getSteps().length;
         const totalOps: number = opsLeft;
 
+        const callback = (step: string) => {
+            return () => {
+                log.debug(`Finished ${step}: Have ${opsLeft - 1} ops left outta ${totalOps}`);
+                response.finishStep(step);
+                if (--opsLeft == 0) {
+                    response.resolveOk(report);
+                }
+            }
+        }
+
         const facilityIDs: string[] = parameters.captures.filter(iter => parameters.outfits.indexOf(iter.outfitID) > -1)
             .map(iter => iter.facilityID)
             .filter((value, index, arr) => arr.indexOf(value) == index);
@@ -354,16 +364,6 @@ export class OutfitReportGenerator {
                 players: parameters.playerCaptures
             }).ok(data => report.baseCaptures = data).always(callback("Facility captures"));
         });
-
-        const callback = (step: string) => {
-            return () => {
-                log.debug(`Finished ${step}: Have ${opsLeft - 1} ops left outta ${totalOps}`);
-                response.finishStep(step);
-                if (--opsLeft == 0) {
-                    response.resolveOk(report);
-                }
-            }
-        }
 
         const chars: TrackedPlayer[] = Array.from(parameters.players.values());
 
