@@ -50,19 +50,10 @@ export class WeaponAPI {
         };
     }
 
-    public static loadJson(): void {
-        /*
-        const response = new ApiResponse(
-            $.get("/data/weapons_new.json"),
-            ((data: any) => {
-                const weapons: any[] = Array.isArray(data) ? data : JSON.parse(data);
-                for (const datum of weapons) {
-                    const wep: Weapon = WeaponAPI.parseCharacter(datum);
-                    this._cache.set(wep.ID, wep);
-                }
-            })
-        )
-        */
+    public static setCache(weapons: Weapon[]): void {
+        for (const weapon of weapons) {
+            WeaponAPI._cache.set(weapon.ID, weapon);
+        }
     }
 
     public static getEntires(): Weapon[] {

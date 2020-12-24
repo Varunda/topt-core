@@ -6,6 +6,9 @@ export default class StatMap {
     }
 
     public increment(statName: string, amount: number = 1): void {
+        if (statName == "-3") {
+            console.log(`Got a capture`);
+        }
         this._stats.set(statName, (this._stats.get(statName) || 0) + amount);
     }
 

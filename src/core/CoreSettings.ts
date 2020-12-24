@@ -19,4 +19,9 @@ export class CoreSettings {
      */
     public serverID: string = "1";
 
+    /**
+     * If debug options will be shown
+     */
+    public debug: boolean = false;
+
 }

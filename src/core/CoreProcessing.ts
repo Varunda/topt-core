@@ -6,9 +6,9 @@ import { PsLoadout, PsLoadouts } from "./census/PsLoadout";
 import { Weapon, WeaponAPI } from "./census/WeaponAPI";
 import { CharacterAPI, Character } from "./census/CharacterAPI";
 
-import { FacilityCapture, TrackedRouter } from "./InvididualGenerator";
+import { FacilityCapture, PlayerVersus, TrackedRouter } from "./InvididualGenerator";
 
-import { TrackedPlayer } from "./Objects/TrackedPlayer";
+import { TrackedPlayer } from "./objects/TrackedPlayer";
 
 import {
     TEvent, TEventType,
@@ -21,6 +21,7 @@ import {
 
 import { Logger } from "./Loggers";
 const log = Logger.getLogger("Core.Processing");
+log.enableAll();
 
 declare module "./Core" {
 
@@ -302,6 +303,8 @@ declare module "./Core" {
 
             let player = self.stats.get(playerID);
             if (player != undefined) {
+                log.debug(`Tracked player ${player.name} got a capture on ${ev.facilityID}`);
+                console.log(`Tracked player ${player.name} got a capture on ${ev.facilityID}`);
                 player.stats.increment(PsEvent.baseCapture);
                 player.events.push(ev);
             }
@@ -325,12 +328,14 @@ declare module "./Core" {
 
             self.playerCaptures.push(ev);
 
-            self.emit(ev);
-
             let player = self.stats.get(playerID);
             if (player != undefined) {
                 player.stats.increment(PsEvent.baseDefense);
+                player.events.push(ev);
             }
+
+            self.emit(ev);
+
             save = true;
         } else if (event == "AchievementEarned") {
             const charID: string = msg.payload.character_id;

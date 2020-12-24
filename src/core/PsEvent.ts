@@ -67,6 +67,7 @@ export class PsEvent {
 
     public static roadkill: string = "26";
     public static transportAssists: string = "30";
+    public static galaxySpawn: string = "201";
 
     public static concAssist: string = "550";
     public static squadConcAssist: string = "551";
@@ -130,25 +131,21 @@ export const PsEvents: Map<string, PsEvent> = new Map<string, PsEvent>([
         name: "Kill assist",
         types: ["versus"],
         track: true,
-        alsoIncrement: undefined
     }],
     [PsEvent.heal, { // 4
         name: "Heal",
         types: ["medic"],
         track: true,
-        alsoIncrement: undefined
     }],
     [PsEvent.healAssist, { // 5
         name: "Heal assist",
         types: [],
         track: true,
-        alsoIncrement: undefined
     }],
     [PsEvent.maxRepair, { // 6
         name: "MAX repair",
         types: ["engineer"],
         track: true,
-        alsoIncrement: undefined
     }],
     [PsEvent.revive, { // 7
         name: "Revive",
@@ -192,37 +189,37 @@ export const PsEvents: Map<string, PsEvent> = new Map<string, PsEvent>([
         track: true,
         alsoIncrement: undefined
     }],
-    [PsEvent.resupply, {
+    [PsEvent.resupply, { // 34
         name: "Resupply",
         types: ["engineer"],
         track: true,
         alsoIncrement: undefined
     }],
-    [PsEvent.spotKill, {
+    [PsEvent.spotKill, { // 36
         name: "Spot kill",
         types: ["recon"],
         track: true,
         alsoIncrement: undefined
     }],
-    [PsEvent.squadHeal, {
+    [PsEvent.squadHeal, { // 51
         name: "Squad heal",
         types: ["medic"],
         track: true,
         alsoIncrement: PsEvent.heal
     }],
-    [PsEvent.squadRevive, {
+    [PsEvent.squadRevive, { // 53
         name: "Squad revive",
         types: ["medic"],
         track: true,
         alsoIncrement: PsEvent.revive
     }],
-    [PsEvent.squadSpotKill, {
+    [PsEvent.squadSpotKill, { // 54
         name: "Squad spot kill",
         types: ["recon"],
         track: true,
         alsoIncrement: PsEvent.spotKill
     }],
-    [PsEvent.squadResupply, {
+    [PsEvent.squadResupply, { // 55
         name: "Squad resupply",
         types: ["engineer"],
         track: true,
@@ -236,13 +233,13 @@ export const PsEvents: Map<string, PsEvent> = new Map<string, PsEvent>([
     }],
     remap("140", "99"), // Squad sundy repair
 
-    [PsEvent.vehicleRepair, {
+    [PsEvent.vehicleRepair, { // 90
         name: "Vehicle repair",
         types: ["engineer"],
         track: true,
         alsoIncrement: undefined
     }],
-    [PsEvent.headshot, {
+    [PsEvent.headshot, { // 37
         name: "Headshot",
         types: ["versus"],
         track: false,
@@ -254,13 +251,13 @@ export const PsEvents: Map<string, PsEvent> = new Map<string, PsEvent>([
         track: true,
         alsoIncrement: undefined
     }],
-    [PsEvent.squadMaxRepair, {
+    [PsEvent.squadMaxRepair, { // 142
         name: "Squad MAX repair",
         types: ["engineer"],
         track: true,
         alsoIncrement: PsEvent.maxRepair
     }],
-    ["201", {
+    [PsEvent.galaxySpawn, { // 201
         name: "Galaxy spawn bonus",
         types: ["logistics"],
         track: true,
