@@ -21,7 +21,6 @@ import {
 
 import { Logger } from "./Loggers";
 const log = Logger.getLogger("Core.Processing");
-log.enableAll();
 
 declare module "./Core" {
 
@@ -480,7 +479,12 @@ declare module "./Core" {
 
         log.info(`Processed a toptMarker event: ${JSON.stringify(msg)}`);
 
-        const ev: TMarkerEvent = msg.payload;
+        const ev: TMarkerEvent = {
+            type: "marker",
+            mark: msg.payload.mark,
+            sourceID: msg.payload.sourceID,
+            timestamp: Number.parseInt(msg.payload.timestamp)
+        };
         self.miscEvents.push(ev);
 
         save = true;

@@ -7,7 +7,6 @@ import { ApiResponse } from "./census/ApiWrapper";
 
 import { Logger } from "./Loggers";
 const log = Logger.getLogger("Playback");
-log.enableAll();
 
 export class PlaybackOptions {
 

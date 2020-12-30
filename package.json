@@ -25,7 +25,7 @@
   ],
   "dependencies": {
     "axios": "^0.21.0",
-    "loglevel": "^1.7.0",
+    "loglevel": "^1.7.1",
     "loglevel-plugin-prefix": "^0.8.4",
     "websocket": "^1.0.32"
   }

@@ -1,4 +1,4 @@
-import { ApiResponse } from "./census/ApiWrapper";
+import { ApiResponse, ResponseContent } from "./census/ApiWrapper";
 
 import CensusAPI from "./census/CensusAPI";
 import { OutfitAPI, Outfit } from "./census/OutfitAPI";
@@ -366,7 +366,12 @@ export class Core {
         };
 
         this.rawData.push(JSON.stringify({
-            payload: ev,
+            payload: {
+                type: ev.type,
+                sourceID: ev.sourceID,
+                timestamp: ev.timestamp.toString(), // Census events have timestamp as a string
+                mark: mark
+            },
             service: "event",
             type: "toptMarker"
         }));
@@ -374,6 +379,24 @@ export class Core {
         this.miscEvents.push(ev);
 
         this.emit(ev);
+    }
+
+    public promiseTest(): void {
+        const t: ApiResponse<string> = new ApiResponse();
+        const p: Promise<ResponseContent<string>> = t.promise();
+
+        setTimeout(async () => {
+            const contents: ResponseContent<string> = await p;
+            if (contents.code == 200) {
+                console.log(`200: ${contents.data}`);
+            } else if (contents.code == 500) {
+                console.error(`500: ${contents.data}`);
+            }
+        });
+
+        setTimeout(() => {
+            t.resolve({ code: 200, data: `Hello from the other side` });
+        }, 3000);
     }
 
     /**

@@ -31,7 +31,6 @@ import { FacilityAPI, Facility } from "../census/FacilityAPI";
 
 import { Logger } from "../Loggers";
 const log = Logger.getLogger("OutfitReport");
-log.enableAll();
 
 export class OutfitReportSettings {
 

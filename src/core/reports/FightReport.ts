@@ -1,17 +1,20 @@
 import { TEvent, TCaptureEvent, TDefendEvent } from "../events/index";
-import { ApiResponse } from "../census/ApiWrapper";
+import { ApiResponse, ResponseContent } from "../census/ApiWrapper";
 import { TrackedPlayer } from "../objects/TrackedPlayer";
 import { PsEvent } from "../PsEvent";
 import { Breakdown, BreakdownArray, BreakdownTimeslot } from "../EventReporter";
 import { IndividualReporter, Playtime } from "../InvididualGenerator";
 import { Facility, FacilityAPI } from "../census/FacilityAPI";
+import StatMap from "../StatMap";
 
 import { Logger } from "../Loggers";
 const log = Logger.getLogger("FightReport");
-log.enableAll();
 
 export class FightReportParameters {
 
+    /**
+     * Events used to generate the report
+     */
     public events: TEvent[] = [];
 
     /**
@@ -37,6 +40,14 @@ export class FightReport {
      * Each fight in the session
      */
     public entries: FightReportEntry[] = [];
+
+}
+
+export class FightReportEncounter {
+
+    public charID: string = "";
+
+    public timestamps: number[] = [];
 
 }
 
@@ -81,6 +92,16 @@ export class FightReportEntry {
      * Events that occured during the fight
      */
     public events: TEvent[] = [];
+
+    /**
+     * Char IDs of all the allies found at the fight
+     */
+    public allies: Map<string, number> = new Map();
+
+    /**
+     * Char IDs of all enemies found at the fight
+     */
+    public enemies: Map<string, number> = new Map();
 
     public count = {
         score: 0 as number,
@@ -189,9 +210,6 @@ export class FightReportGenerator {
         report.startTime = new Date(parameters.events[0].timestamp);
         report.endTime = new Date(parameters.events[parameters.events.length - 1].timestamp);
 
-        let inFight: boolean = false;
-        let entry: FightReportEntry = new FightReportEntry();
-
         const playerIDs: string[] = [];
         parameters.players.forEach((player: TrackedPlayer, charID: string) => {
             playerIDs.push(charID);
@@ -202,8 +220,24 @@ export class FightReportGenerator {
             .map(iter => (iter as TCaptureEvent | TDefendEvent).facilityID)
             .filter((v, i, a) => a.indexOf(v) == i);
 
+        // These events will contain the char ID of someone who is allied to the source,
+        //      which is useful in determining which base a fight took place at
+        const allyEventIDs: string[] = [
+            PsEvent.heal, PsEvent.squadHeal,
+            PsEvent.revive, PsEvent.squadRevive,
+            PsEvent.resupply, PsEvent.squadResupply,
+            PsEvent.maxRepair, PsEvent.squadMaxRepair,
+            PsEvent.shieldRepair, PsEvent.squadShieldRepair,
+        ];
+
         FacilityAPI.getByIDs(facilityIDs).ok((facilities: Facility[]) => {
             log.debug(`Loaded ${facilities.length} from ${facilityIDs.length} IDs`);
+
+            let inFight: boolean = false;
+            let entry: FightReportEntry = new FightReportEntry();
+
+            let alliesFound: Map<string, number> = new Map();
+            let enemiesFound: Map<string, number> = new Map();
 
             for (let i = 0; i < parameters.events.length; ++ i) {
                 const event: TEvent = parameters.events[i];
@@ -220,12 +254,16 @@ export class FightReportGenerator {
                         inFight = true;
                     } else if (event.mark == "battle-end") {
                         if (inFight == true) {
-                            log.debug(`Current fight ended, saving`);
+                            log.debug(`Current fight ended at ${event.timestamp} (from ${entry.startTime.getTime()}), saving`);
 
                             entry.endTime = new Date(event.timestamp);
                             entry.duration = (event.timestamp - entry.startTime.getTime()) / 1000; // ms to seconds
+                            entry.allies = alliesFound;
+                            entry.enemies = enemiesFound;
 
-                            report.entries.push(this.finalizeEntry(entry, parameters));
+                            log.info(`#Allies: ${entry.allies.size}, #Enemies: ${entry.enemies.size}`);
+
+                            report.entries.push(this.finalizeEntry(entry, parameters, facilities));
 
                             entry = new FightReportEntry();
                         }
@@ -243,8 +281,12 @@ export class FightReportGenerator {
                 // Handle the event based on it's type
                 if (event.type == "kill") {
                     ++entry.count.kills;
-                } else if (event.type == "death" && event.revived == false) {
-                    ++entry.count.deaths;
+                    enemiesFound.set(event.targetID, event.timestamp);
+                } else if (event.type == "death") {
+                    if (event.revived == false) {
+                        ++entry.count.deaths;
+                    }
+                    enemiesFound.set(event.targetID, event.timestamp);
                 } else if (event.type == "exp") {
                     if (event.expID == PsEvent.heal || event.expID == PsEvent.squadHeal) {
                         ++entry.count.heals;
@@ -253,11 +295,16 @@ export class FightReportGenerator {
                     } else if (event.expID == PsEvent.squadSpawn || ["201", "233", "355", "1410"].indexOf(event.expID) > -1) {
                         ++entry.count.spawns;
                     }
+
+                    if (allyEventIDs.indexOf(event.expID) > -1){
+                        alliesFound.set(event.targetID, event.timestamp);
+                    }
                 } else if (event.type == "capture") {
                     if (playerIDs.indexOf(event.sourceID) > -1) {
                         if (entry.facilityID == null) {
                             const fac: Facility | undefined = facilities.find(iter => iter.ID == event.facilityID);
-                            entry.name = `Capture of ${fac?.name ?? `bad ID ${event.facilityID}`}`;
+                            entry.name = `Successful capture of ${fac?.name ?? `bad ID ${event.facilityID}`}`;
+                            entry.facilityID = event.facilityID;
                         } else if (entry.facilityID != event.facilityID) {
                             log.warn(`Fight already has a name: ${entry.name}`);
                         }
@@ -267,7 +314,8 @@ export class FightReportGenerator {
                 } else if (event.type == "defend" && playerIDs.indexOf(event.sourceID) > -1) {
                     if (entry.facilityID == null) {
                         const fac: Facility | undefined = facilities.find(iter => iter.ID == event.facilityID);
-                        entry.name = `Defense of ${fac?.name ?? `bad ID ${event.facilityID}`}`;
+                        entry.name = `Successful defense of ${fac?.name ?? `bad ID ${event.facilityID}`}`;
+                        entry.facilityID = event.facilityID;
                     } else if (entry.facilityID != event.facilityID) {
                         log.warn(`Fight already has a name: ${entry.name}`);
                     }
@@ -287,7 +335,7 @@ export class FightReportGenerator {
      * 
      * @returns |entry|
      */
-    private static finalizeEntry(entry: FightReportEntry, parameters: FightReportParameters): FightReportEntry {
+    private static finalizeEntry(entry: FightReportEntry, parameters: FightReportParameters, facilities: Facility[]): FightReportEntry {
 
         // Get all the participants during a fight
         for (const event of entry.events) {
@@ -329,12 +377,16 @@ export class FightReportGenerator {
                     ++part.spawns;
                 }
             }
+
+            if (event.timestamp < entry.startTime.getTime() || event.timestamp > entry.endTime.getTime()) {
+                log.warn(`Event at ${event.timestamp} occured outside fight period (${entry.startTime.getTime()} to ${entry.endTime.getTime()}): ${JSON.stringify(event)}`);
+            }
         }
 
         const classBreakdown: BreakdownArray = new BreakdownArray();
         const classArray: Breakdown[] = [
             { display: "Infiltrator", sortField: "", amount: 0, color: undefined },
-            { display: "LA", sortField: "", amount: 0, color: undefined },
+            { display: "Light Assault", sortField: "", amount: 0, color: undefined },
             { display: "Medic", sortField: "", amount: 0, color: undefined },
             { display: "Engineer", sortField: "", amount: 0, color: undefined },
             { display: "Heavy", sortField: "", amount: 0, color: undefined },
@@ -401,6 +453,8 @@ export class FightReportGenerator {
 
         const encountered: string[] = [];
 
+        // More stat getting, it's in a separate loop to make things logically easier to understand
+        //      with the huge downside of going thru all the events multiple times
         for (const event of entry.events) {
             if (event.type == "kill") {
                 killCount += 1;
@@ -470,6 +524,81 @@ export class FightReportGenerator {
                     });
                 }
             }
+        }
+
+        if (entry.facilityID == null) {
+            log.debug(`No name for fight yet, finding`);
+            log.debug(`Allies: ${entry.allies.size}`);
+            log.debug(`Enemies: ${entry.enemies.size}`);
+
+            let successCaps: StatMap = new StatMap();
+            let failedCaps: StatMap = new StatMap();
+            let successDef: StatMap = new StatMap();
+            let failedDef: StatMap = new StatMap();
+
+            for (const event of entry.events) {
+                if (event.type == "capture") {
+                    log.debug(`Capture event: ${JSON.stringify(event)}`);
+
+                    if (entry.allies.has(event.sourceID)) {
+                        const value: number = entry.allies.get(event.sourceID)!;
+                        const diff: number = value - entry.startTime.getTime();
+                        log.debug(`Have a ${diff}ms diff between when ${event.sourceID} was seen and a good cap`);
+                        successCaps.increment(event.facilityID, diff);
+                    }
+
+                    if (entry.enemies.has(event.sourceID)) {
+                        const value: number = entry.enemies.get(event.sourceID)!;
+                        const diff: number = value - entry.startTime.getTime();
+                        log.debug(`Have a ${diff}ms diff between when ${event.sourceID} was seen and a bad def`);
+                        failedDef.increment(event.facilityID, diff);
+                    }
+                } else if (event.type == "defend") {
+                    log.debug(`Defend event: ${JSON.stringify(event)}`);
+                    if (entry.allies.has(event.sourceID)) {
+                        const value: number = entry.allies.get(event.sourceID)!;
+                        const diff: number = value - entry.startTime.getTime();
+                        log.debug(`Have a ${diff}ms diff between when ${event.sourceID} was seen and a good def`);
+                        successDef.increment(event.facilityID, diff);
+                    }
+
+                    if (entry.enemies.has(event.sourceID)) {
+                        const value: number = entry.enemies.get(event.sourceID)!;
+                        const diff: number = value - entry.startTime.getTime();
+                        log.debug(`Have a ${diff}ms diff between when ${event.sourceID} was seen and a good def`);
+                        failedCaps.increment(event.facilityID, diff);
+                    }
+                }
+            }
+
+            log.info(`Cap/Def info:\n #SuccessCaps: ${successCaps.size()}\n #FailedCaps: ${failedCaps.size()}\n #SuccessDefs: ${successDef.size()}\n #FailedDefs: ${failedDef.size()}`);
+            log.debug(`${successCaps}`);
+            log.debug(`${failedCaps}`);
+            log.debug(`${successDef}`);
+            log.debug(`${failedDef}`);
+
+            let confidence: number = 0;
+            let name: string = `Unknown fight`;
+
+            const updateWeight = (map: StatMap, context: string): void => {
+                map.getMap().forEach((weight: number, facID: string) => {
+                    log.debug(`Checking if ${weight} from '${context}' at ${facID} is greater than ${confidence}`);
+                    if (weight > confidence) {
+                        const facility: Facility | undefined = facilities.find(iter => iter.ID == facID);
+
+                        name = `${context} of ${facility?.name ?? `unknown facility ID ${facID}`}`;
+                        confidence = weight;
+                        entry.facilityID = facID;
+                    }
+                });
+            };
+
+            updateWeight(successCaps, "Successful capture");
+            updateWeight(failedCaps, "Failed capture");
+            updateWeight(successDef, "Successful defense");
+            updateWeight(failedDef, "Failed defense");
+
+            entry.name = name;
         }
 
         return entry;
