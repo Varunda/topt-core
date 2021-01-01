@@ -17,6 +17,8 @@ import {
     TMarkerEvent
 } from "./events/index";
 
+import { SubscribeOptions } from "./objects/SubscribeOptions";
+
 import { Squad } from "./squad/Squad";
 import { SquadMember } from "./squad/SquadMember"
 
@@ -155,7 +157,8 @@ export class Core {
         vehicle: [] as TEventHandler<"vehicle">[],
         login: [] as TEventHandler<"login">[],
         logout: [] as TEventHandler<"logout">[],
-        marker: [] as TEventHandler<"marker">[]
+        marker: [] as TEventHandler<"marker">[],
+        base: [] as TEventHandler<"base">[]
     };
 
     /**
@@ -185,6 +188,7 @@ export class Core {
             case "login": this.handlers.login.push(handler as TEventHandler<"login">); break;
             case "logout": this.handlers.logout.push(handler as TEventHandler<"logout">); break;
             case "marker": this.handlers.marker.push(handler as TEventHandler<"marker">); break;
+            case "base": this.handlers.base.push(handler as TEventHandler<"base">); break;
             default: throw `Unchecked event type ${type}`;
         }
     }
@@ -206,6 +210,7 @@ export class Core {
             this.handlers.login.length = 0;
             this.handlers.logout.length = 0;
             this.handlers.marker.length = 0;
+            this.handlers.base.length = 0;
         } else {
             this.handlers[type].length = 0;
         }
@@ -374,6 +379,22 @@ export class Core {
         this.miscEvents.push(ev);
 
         this.emit(ev);
+    }
+
+    public subscribe(options: SubscribeOptions): void {
+        const json: string = JSON.stringify(options.toObject());
+
+        log.debug(`Sending on ${options.socket}: ${json}`);
+
+        if (options.socket == "logistics") {
+            this.sockets.logistics!.send(json);
+        } else if (options.socket == "login") {
+            this.sockets.logins!.send(json);
+        } else if (options.socket == "tracked") {
+            this.sockets.tracked!.send(json);
+        } else {
+            throw `Unknown socket to subscribe: ${options.socket}`;
+        }
     }
 
     /**

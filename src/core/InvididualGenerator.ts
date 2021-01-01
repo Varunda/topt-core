@@ -917,7 +917,7 @@ export class IndividualReporter {
         usage.secondsOnline = (finalTimestamp - lastTimestamp) / 1000;
 
         parameters.player.events.forEach((event: TEvent) => {
-            if (event.type == "capture" || event.type == "defend" || event.type == "login" || event.type == "logout" || event.type == "marker") {
+            if (event.type == "capture" || event.type == "defend" || event.type == "login" || event.type == "logout" || event.type == "marker" || event.type == "base") {
                 return;
             }
 

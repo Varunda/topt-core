@@ -15,8 +15,8 @@ import {
     TExpEvent, TKillEvent, TDeathEvent, TTeamkillEvent,
     TCaptureEvent, TDefendEvent,
     TVehicleKillEvent, TLoginEvent, TLogoutEvent,
+    TMarkerEvent, TBaseEvent,
     TEventHandler,
-    TMarkerEvent
 } from "./events/index";
 
 import { Logger } from "./Loggers";
@@ -345,7 +345,7 @@ declare module "./Core" {
             const outfitID: string = msg.payload.outfit_id;
             const facilityID: string = msg.payload.facility_id;
 
-            self.captures.push({
+            const capture = {
                 facilityID: facilityID,
                 zoneID: zoneID,
                 timestamp: new Date(timestamp),
@@ -353,9 +353,25 @@ declare module "./Core" {
                 factionID: msg.payload.new_faction_id,
                 outfitID: outfitID,
                 previousFaction: msg.payload.old_faction_id,
-            });
+            };
+
+            self.captures.push(capture);
 
             save = true;
+
+            const ev: TBaseEvent = {
+                type: "base",
+                sourceID: "7153",
+                facilityID: capture.facilityID,
+                timestamp: timestamp,
+                zoneID: zoneID,
+                outfitID: capture.outfitID,
+                factionID: capture.factionID,
+                previousFactionID: capture.previousFaction,
+                timeHeld: capture.timeHeld
+            }
+
+            self.emit(ev);
         } else if (event == "ItemAdded") {
             const itemID: string = msg.payload.item_id;
             const charID: string = msg.payload.character_id;
