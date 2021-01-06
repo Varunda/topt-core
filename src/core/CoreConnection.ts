@@ -56,11 +56,12 @@ declare module "./Core" {
         }
     }
 
-    setupTrackerSocket(self).always(() => { handler(); });
-    setupLoginSocket(self).always(() => { handler(); });
-    setupLogisticsSocket(self).always(() => { handler(); });
-    setupFacilitySocket(self).always(() => { handler(); });
-    setupDebugSocket(self).always(() => { handler(); });
+    setupTrackerSocket(self).always(() => handler());
+    setupLoginSocket(self).always(() => handler());
+    setupLogisticsSocket(self).always(() => handler());
+    setupFacilitySocket(self).always(() => handler());
+    setupDebugSocket(self).always(() => handler());
+    setupAddedSocket(self).always(() => handler());
 
     return response;
 };
@@ -73,6 +74,7 @@ declare module "./Core" {
     if (self.sockets.logistics != null) { self.sockets.logistics.close(); self.sockets.logistics = null; }
     if (self.sockets.facility != null) { self.sockets.facility.close(); self.sockets.facility = null; }
     if (self.sockets.debug != null) { self.sockets.debug.close(); self.sockets.debug = null; }
+    if (self.sockets.added != null) { self.sockets.added.close(); self.sockets.added = null; }
 
     self.connected = false;
 };
@@ -113,6 +115,19 @@ function setupDebugSocket(core: Core): ApiResponse {
         };
         response.resolveOk();
     };
+
+    return response;
+}
+
+function setupAddedSocket(core: Core): ApiResponse { 
+    const response: ApiResponse = new ApiResponse();
+
+    core.sockets.added = new w3cwebsocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${core.serviceID}`);
+    core.sockets.added.onopen = () => { response.resolveOk(); };
+    core.sockets.added.onerror = () => {
+        response.resolve({ code: 500, data: `` });
+    };
+    core.sockets.added.onmessage = core.onmessage.bind(core);
 
     return response;
 }

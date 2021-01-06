@@ -20,4 +20,6 @@ export type TBaseEvent = {
 
     outfitID: string;
 
+    worldID: string;
+
 }

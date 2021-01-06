@@ -32,19 +32,10 @@ export class FacilityAPI {
 
     private static _timeoutID: number = -1;
 
-    public static loadJson(): void {
-        /*
-        new ApiResponse(
-            $.get("/bases.json"),
-            ((data: any) => {
-                const bs: any[] = Array.isArray(data) ? data : JSON.parse(data);
-                for (const datum of bs) {
-                    const wep: Facility = FacilityAPI.parse(datum);
-                    this._cache.set(wep.ID, wep);
-                }
-            })
-        );
-        */
+    public static setCache(data: Facility[]): void {
+        for (const fac of data) {
+            FacilityAPI._cache.set(fac.ID, fac);
+        }
     }
 
     public static precache(facilityID: string): void {

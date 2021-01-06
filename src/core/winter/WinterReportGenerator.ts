@@ -6,7 +6,7 @@ import { WinterReportParameters } from "./WinterReportParameters";
 
 import StatMap from "../StatMap";
 import { PsEvent } from "../PsEvent";
-import { TrackedPlayer } from "../Objects/TrackedPlayer";
+import { TrackedPlayer } from "../objects/TrackedPlayer";
 import { Vehicles } from "../census/VehicleAPI";
 import { WeaponAPI, Weapon } from "../census/WeaponAPI";
 import { PsLoadout, PsLoadouts } from "../census/PsLoadout";

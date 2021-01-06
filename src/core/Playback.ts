@@ -7,7 +7,6 @@ import { ApiResponse } from "./census/ApiWrapper";
 
 import { Logger } from "./Loggers";
 const log = Logger.getLogger("Playback");
-log.enableAll();
 
 export class PlaybackOptions {
 
@@ -18,8 +17,6 @@ export class PlaybackOptions {
 export class Playback {
 
     private static _core: Core | null = null;
-
-    private static _file: File | null = null;
 
     private static _events: any[] = [];
     private static _parsed: any[] = [];
@@ -96,13 +93,14 @@ export class Playback {
                     this._core!.outfits = data;
                     log.info(`From [${outfitIDs.join(", ")}] loaded: ${JSON.stringify(data)}`);
                 }).always(() => {
+                    log.debug(`Took ${new Date().getTime() - nowMs}ms to import data`);
                     response.resolveOk();
                 });
             } else {
+                log.debug(`Took ${new Date().getTime() - nowMs}ms to import data`);
                 response.resolveOk();
             }
 
-            log.debug(`Took ${new Date().getTime() - nowMs}ms to import data`);
         } else {
             log.error(`Unchecked version: ${data.version}`);
             response.resolve({ code: 400, data: `` });
@@ -120,13 +118,33 @@ export class Playback {
         if (parameters.speed <= 0) {
             log.debug(`Doing instant playback`);
 
-            this._core.tracking.startTime = Math.min(...Playback._parsed.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
-            this._core.tracking.endTime = Math.max(...Playback._parsed.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
+            const nowMs: number = new Date().getTime();
+
+            const timestamps: number[] = Playback._parsed.map((iter: any) => {
+                const ts: number | string = iter.payload.timestamp;
+                if (typeof(ts) == "number") { // An old bugged version of expo uses numbers not strings
+                    return ts;
+                }
+
+                if (ts.length == 10) {
+                    return Number.parseInt(ts) * 1000;
+                } else if (ts.length == 13) { // Expo exports with the MS part, Census does not
+                    return Number.parseInt(ts);
+                } else {
+                    log.warn(`Unchecked length of timestamp: ${ts.length} '${ts}'`);
+                    throw ``;
+                }
+            });
+
+            this._core.tracking.startTime = Math.min(...timestamps);
+            this._core.tracking.endTime = Math.max(...timestamps);
 
             for (const ev of Playback._events) {
                 this._core.processMessage(ev, true);
             }
             this._core.stop();
+
+            log.debug(`Took ${new Date().getTime() - nowMs}ms to process data`);
         } else {
             const start: number = Math.min(...Playback._parsed.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
             const end: number = Math.max(...Playback._parsed.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));

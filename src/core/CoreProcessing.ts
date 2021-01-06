@@ -6,9 +6,9 @@ import { PsLoadout, PsLoadouts } from "./census/PsLoadout";
 import { Weapon, WeaponAPI } from "./census/WeaponAPI";
 import { CharacterAPI, Character } from "./census/CharacterAPI";
 
-import { FacilityCapture, TrackedRouter } from "./InvididualGenerator";
+import { FacilityCapture, PlayerVersus, TrackedRouter } from "./InvididualGenerator";
 
-import { TrackedPlayer } from "./Objects/TrackedPlayer";
+import { TrackedPlayer } from "./objects/TrackedPlayer";
 
 import {
     TEvent, TEventType,
@@ -282,7 +282,6 @@ declare module "./Core" {
                 }
 
                 save = true;
-
             }
         } else if (event == "PlayerFacilityCapture") {
             const playerID: string = msg.payload.character_id;
@@ -302,6 +301,7 @@ declare module "./Core" {
 
             let player = self.stats.get(playerID);
             if (player != undefined) {
+                log.debug(`Tracked player ${player.name} got a capture on ${ev.facilityID}`);
                 player.stats.increment(PsEvent.baseCapture);
                 player.events.push(ev);
             }
@@ -325,12 +325,14 @@ declare module "./Core" {
 
             self.playerCaptures.push(ev);
 
-            self.emit(ev);
-
             let player = self.stats.get(playerID);
             if (player != undefined) {
                 player.stats.increment(PsEvent.baseDefense);
+                player.events.push(ev);
             }
+
+            self.emit(ev);
+
             save = true;
         } else if (event == "AchievementEarned") {
             const charID: string = msg.payload.character_id;
@@ -368,7 +370,8 @@ declare module "./Core" {
                 outfitID: capture.outfitID,
                 factionID: capture.factionID,
                 previousFactionID: capture.previousFaction,
-                timeHeld: capture.timeHeld
+                timeHeld: capture.timeHeld,
+                worldID: msg.payload.world_id
             }
 
             self.emit(ev);
@@ -491,7 +494,12 @@ declare module "./Core" {
 
         log.info(`Processed a toptMarker event: ${JSON.stringify(msg)}`);
 
-        const ev: TMarkerEvent = msg.payload;
+        const ev: TMarkerEvent = {
+            type: "marker",
+            mark: msg.payload.mark,
+            sourceID: msg.payload.sourceID,
+            timestamp: Number.parseInt(msg.payload.timestamp)
+        };
         self.miscEvents.push(ev);
 
         save = true;

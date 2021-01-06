@@ -28,4 +28,8 @@ export default class StatMap {
 
     public clear(): void { this._stats.clear(); }
 
+    public toString(): string {
+        return JSON.stringify(Array.from(this._stats.entries()));
+    }
+
 }

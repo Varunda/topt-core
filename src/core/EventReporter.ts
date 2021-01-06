@@ -16,12 +16,11 @@ import {
 } from "./events/index";
 
 import { IndividualReporter, TimeTracking, Playtime, FacilityCapture } from "./InvididualGenerator";
-import { TrackedPlayer } from "./Objects/TrackedPlayer";
+import { TrackedPlayer } from "./objects/TrackedPlayer";
 import { OutfitAPI, Outfit } from "./census/OutfitAPI";
 
 import { Logger } from "./Loggers";
 const log = Logger.getLogger("EventReporter");
-log.enableAll();
 
 export class BreakdownArray {
     data: Breakdown[] = [];

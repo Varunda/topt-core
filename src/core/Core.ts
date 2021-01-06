@@ -1,4 +1,4 @@
-import { ApiResponse } from "./census/ApiWrapper";
+import { ApiResponse, ResponseContent } from "./census/ApiWrapper";
 
 import CensusAPI from "./census/CensusAPI";
 import { OutfitAPI, Outfit } from "./census/OutfitAPI";
@@ -40,7 +40,8 @@ export class Core {
         logistics: null as w3cwebsocket | null,
         logins: null as w3cwebsocket | null,
         facility: null as w3cwebsocket | null,
-        debug: null as w3cwebsocket | null
+        debug: null as w3cwebsocket | null,
+        added: null as w3cwebsocket | null
     };
 
     /**
@@ -371,7 +372,12 @@ export class Core {
         };
 
         this.rawData.push(JSON.stringify({
-            payload: ev,
+            payload: {
+                type: ev.type,
+                sourceID: ev.sourceID,
+                timestamp: ev.timestamp.toString(), // Census events have timestamp as a string
+                mark: mark
+            },
             service: "event",
             type: "toptMarker"
         }));
@@ -382,12 +388,32 @@ export class Core {
     }
 
     public subscribe(options: SubscribeOptions): void {
-        const json: string = JSON.stringify(options.toObject());
+        let obj: any = {
+            action: "subscribe",
+            service: "event"
+        };
 
+        if (options.characters && options.characters.length > 0) {
+            obj.characters = options.characters;
+        }
+
+        if (options.worlds && options.worlds.length > 0) {
+            obj.worlds = options.worlds;
+        }
+
+        if (options.events && options.events.length > 0) {
+            obj.eventNames = options.events;
+        }
+
+        if (options.charactersWorldAnd == true) {
+            obj.logicalAndCharactersWithWorlds = true;
+        }
+
+        const json: string = JSON.stringify(obj);
         log.debug(`Sending on ${options.socket}: ${json}`);
 
-        if (options.socket == "logistics") {
-            this.sockets.logistics!.send(json);
+        if (options.socket == undefined || options.socket == "added") {
+            this.sockets.added!.send(json);
         } else if (options.socket == "login") {
             this.sockets.logins!.send(json);
         } else if (options.socket == "tracked") {
@@ -395,6 +421,24 @@ export class Core {
         } else {
             throw `Unknown socket to subscribe: ${options.socket}`;
         }
+    }
+
+    public promiseTest(): void {
+        const t: ApiResponse<string> = new ApiResponse();
+        const p: Promise<ResponseContent<string>> = t.promise();
+
+        setTimeout(async () => {
+            const contents: ResponseContent<string> = await p;
+            if (contents.code == 200) {
+                console.log(`200: ${contents.data}`);
+            } else if (contents.code == 500) {
+                console.error(`500: ${contents.data}`);
+            }
+        });
+
+        setTimeout(() => {
+            t.resolve({ code: 200, data: `Hello from the other side` });
+        }, 3000);
     }
 
     /**

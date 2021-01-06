@@ -1,5 +1,7 @@
 import * as axios from "axios";
-import log = require("loglevel");
+
+import { Logger } from "../Loggers";
+const log = Logger.getLogger("ApiWrapper");
 
 export type ResponseContent<T> =
     { code: 200, data: T } // OK
@@ -28,6 +30,9 @@ export type ResponseCodes = 200 | 201 | 204 | 400 | 401 | 403 | 404 | 413 | 500 
 
 type ApiResponseCallback = (data: any) => void;
 
+/**
+ * Different states a step can have
+ */
 export type StepState = "done" | "working" | "errored";
 
 // Default to void as undefined is assignable to void. Would prefer to use never, but there is
@@ -171,6 +176,11 @@ export class ApiResponse<T = void> {
         this.resolve({ code: 200, data: data });
     }
 
+    /**
+     * Add a new step to be tracked
+     * 
+     * @param step Step being completed
+     */
     public addStep(step: string): this {
         if (this._steps == null) {
             this._steps = new Map<string, StepState>();
@@ -185,6 +195,12 @@ export class ApiResponse<T = void> {
         return this;
     }
 
+    /**
+     * Update the state a step has
+     * 
+     * @param step  Step to update
+     * @param state New state of the step being updated
+     */
     public updateStep(step: string, state: StepState): void {
         if (this._steps == null) {
             log.warn(`Cannot update setp '${step}' to ${state}: No steps have been created`);
@@ -198,10 +214,18 @@ export class ApiResponse<T = void> {
         this._steps.set(step, state);
     }
 
+    /**
+     * Shortcut method to mark a step as done
+     * 
+     * @param step Step to mark as done
+     */
     public finishStep(step: string): void {
         this.updateStep(step, "done");
     }
 
+    /**
+     * Get the steps in this ApiResponse
+     */
     public getSteps(): string[] {
         if (this._steps == null) {
             throw `No steps defined. Cannot get steps`;
@@ -210,6 +234,11 @@ export class ApiResponse<T = void> {
         return Array.from(this._steps.keys());
     }
 
+    /**
+     * Get the state of a specific step. If no steps have been defined, an error is thrown
+     * 
+     * @param step Step to get the state of
+     */
     public getStepState(step: string): StepState | null {
         if (this._steps == null) {
             throw `Not steps defined. Cannot get step state`;
@@ -271,6 +300,20 @@ export class ApiResponse<T = void> {
             this._callbacks.set(status, []);
         }
         this._callbacks.get(status)!.push(func); // TS doesn't see the .set() above making this not undefined
+    }
+
+    public promise(): Promise<ResponseContent<T>> {
+        return new Promise<ResponseContent<T>>((resolve, reject) => {
+            this.always(() => {
+                if (this.status == 200) {
+                    resolve({ code: 200, data: this.data as T });
+                } else if (this.status == 500) {
+                    resolve({ code: 500, data: this.data as string });
+                } else {
+                    reject(`Unchecked status ${this.status}`);
+                }
+            });
+        });
     }
 
     /**

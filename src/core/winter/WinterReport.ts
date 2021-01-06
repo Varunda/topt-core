@@ -1,6 +1,6 @@
 import { WinterMetric } from "./WinterMetric";
 
-import { TrackedPlayer } from "../Objects/TrackedPlayer";
+import { TrackedPlayer } from "../objects/TrackedPlayer";
 
 export class WinterReport {
     public start: Date = new Date();
