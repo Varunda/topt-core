@@ -159,4 +159,25 @@ export class FacilityAPI {
         return response;
     }
 
+    public static getAll(): ApiResponse<Facility[]> {
+        const response: ApiResponse<Facility[]> = new ApiResponse();
+
+        const facilities: Facility[] = [];
+
+        const request: ApiResponse<any> = CensusAPI.get(
+            `/map_region?&c:limit=10000`
+        );
+
+        request.ok((data: any) => {
+            for (const datum of data.map_region_list) {
+                const fac: Facility = FacilityAPI.parse(datum);
+                facilities.push(fac);
+            }
+
+            response.resolveOk(facilities);
+        });
+
+        return response;
+    }
+
 }

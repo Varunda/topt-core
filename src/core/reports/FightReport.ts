@@ -250,6 +250,10 @@ export class FightReportGenerator {
                             log.debug(`New fight started at ${event.timestamp}`);
 
                             entry.startTime = new Date(event.timestamp);
+                        } else {
+                            log.debug(`battle-start found without a battle-end, discarding previous fight`);
+                            entry = new FightReportEntry();
+                            entry.startTime = new Date(event.timestamp);
                         }
                         inFight = true;
                     } else if (event.mark == "battle-end") {

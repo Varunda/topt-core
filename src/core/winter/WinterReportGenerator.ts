@@ -160,6 +160,15 @@ export class WinterReportGenerator {
         });
     }
 
+    public static shieldRepairs(parameters: WinterReportParameters): WinterMetric {
+        return this.metric(parameters, [PsEvent.shieldRepair, PsEvent.squadShieldRepair], {
+            name: "Shield Repairs",
+            funName: "DIVERT POWER",
+            description: "Most shield repair",
+            entries: []
+        });
+    }
+
     private static kds(parameters: WinterReportParameters): WinterMetric {
         return this.value(
             parameters,

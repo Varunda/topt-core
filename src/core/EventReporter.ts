@@ -705,6 +705,52 @@ export default class EventReporter {
         );
     }
 
+    public static weaponHeadshot(events: TEvent[]): ApiResponse<BreakdownArray> {
+        const total: StatMap = new StatMap();
+        const hs: StatMap = new StatMap();
+
+        const weapons: Set<string> = new Set();
+
+        for (const ev of events) {
+            if (ev.type == "kill") {
+                if (ev.isHeadshot == true) {
+                    hs.increment(ev.weaponID);
+                }
+                total.increment(ev.weaponID);
+
+                weapons.add(ev.weaponID);
+            }
+        }
+
+        const response: ApiResponse<BreakdownArray> = new ApiResponse();
+
+        const arr: BreakdownArray = new BreakdownArray();
+
+        WeaponAPI.getByIDs(Array.from(weapons.values())).ok((data: Weapon[]) => {
+            total.getMap().forEach((kills: number, weaponID: string) => {
+                const hsKills: number = hs.get(weaponID, 0);
+                const hsr: number = hsKills / kills;
+
+                const weapon: Weapon | undefined = data.find(iter => iter.ID == weaponID);
+
+                const entry: Breakdown = {
+                    amount: kills,
+                    display: `${weapon?.name ?? `Weapon ${weaponID}`} ${hsKills}/${kills} (${(hsr * 100).toFixed(2)}%)`,
+                    color: undefined,
+                    sortField: `${kills}`
+                };
+
+                arr.data.push(entry);
+            });
+
+            arr.total = 1;
+
+            response.resolveOk(arr);
+        });
+
+        return response;
+    }
+
     public static weaponTeamkills(events: TEvent[]): ApiResponse<BreakdownArray> {
         const wepKills: StatMap = new StatMap();
 

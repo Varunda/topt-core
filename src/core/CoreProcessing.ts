@@ -498,7 +498,7 @@ declare module "./Core" {
             type: "marker",
             mark: msg.payload.mark,
             sourceID: msg.payload.sourceID,
-            timestamp: Number.parseInt(msg.payload.timestamp)
+            timestamp: Number.parseInt(msg.payload.timestamp),
         };
         self.miscEvents.push(ev);
 

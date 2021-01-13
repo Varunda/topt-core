@@ -134,6 +134,8 @@ export class Core {
      */
     public connected: boolean = false;
 
+    private markerCount: number = 0;
+
     public constructor(serviceID: string, serverID: string) {
         this.serviceID = serviceID;
         this.serverID = serverID;
@@ -368,7 +370,7 @@ export class Core {
             type: "marker",
             sourceID: "7103",
             timestamp: new Date().getTime(),
-            mark: mark
+            mark: mark,
         };
 
         this.rawData.push(JSON.stringify({

@@ -166,6 +166,7 @@ export class Report {
 
     weaponKillBreakdown: BreakdownArray = new BreakdownArray();
     weaponKillTypeBreakdown: BreakdownArray = new BreakdownArray();
+    weaponHeadshotBreakdown: BreakdownArray = new BreakdownArray();
 
     weaponDeathBreakdown: BreakdownArray = new BreakdownArray();
     weaponDeathTypeBreakdown: BreakdownArray = new BreakdownArray();
@@ -283,6 +284,7 @@ export class IndividualReporter {
             + 1     // Medic breakdown
             + 1     // Engineer breakdown
             + 1     // Player versus
+            + 1     // Weapon HS breakdown
         ;
 
         const totalOps: number = opsLeft;
@@ -329,6 +331,8 @@ export class IndividualReporter {
         IndividualReporter.miscCollection(parameters)   
             .ok(data => report.collections.push(data)).always(callback("Misc coll"));
 
+        EventReporter.weaponHeadshot(parameters.player.events)
+            .ok(data => report.weaponHeadshotBreakdown = data).always(callback("Weapon headshots"));
         EventReporter.weaponKills(parameters.player.events)
             .ok(data => report.weaponKillBreakdown = data).always(callback("Weapon kills"));
         EventReporter.weaponTypeKills(parameters.player.events)
