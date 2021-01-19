@@ -114,6 +114,9 @@ export class WeaponAPI {
     public static getByIDs(weaponIDs: string[]): ApiResponse<Weapon[]> {
         const response: ApiResponse<Weapon[]> = new ApiResponse();
 
+        // Remove duplicates
+        weaponIDs = weaponIDs.filter((v, i, a) => a.indexOf(v) == i);
+
         const weapons: Weapon[] = [];
         const requestIDs: string[] = [];
 

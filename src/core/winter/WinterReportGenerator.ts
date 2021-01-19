@@ -31,6 +31,7 @@ export class WinterMetricIndex {
     public static HEALS: number = 3;
     public static RESUPPLIES: number = 4;
     public static REPAIRS: number = 5;
+    public static SHIELDS: number = 6;
 }
 
 export class WinterReportGenerator {
@@ -46,13 +47,15 @@ export class WinterReportGenerator {
 
         report.players = [...parameters.players.filter(iter => iter.events.length > 0)];
 
-        report.essential.length = 6;
+        report.essential.length = 7;
         report.essential[WinterMetricIndex.KILLS] = this.kills(parameters);
         report.essential[WinterMetricIndex.KD] = this.kds(parameters);
         report.essential[WinterMetricIndex.HEALS] = this.heals(parameters);
         report.essential[WinterMetricIndex.REVIVES] = this.revives(parameters);
         report.essential[WinterMetricIndex.REPAIRS] = this.repairs(parameters);
         report.essential[WinterMetricIndex.RESUPPLIES] = this.resupplies(parameters);
+        report.essential[WinterMetricIndex.SHIELDS] = this.shieldRepairs(parameters);
+        log.debug(`Loaded ${report.essential.length} essential metrics`);
 
         report.fun.push(this.mostRevived(parameters));
         report.fun.push(this.mostTransportAssists(parameters));
@@ -103,6 +106,8 @@ export class WinterReportGenerator {
 
                     report.fun = report.fun.slice(0, parameters.settings.funMetricCount);
                 }
+
+                log.debug(`Loaded ${report.fun.length} fun metrics`);
 
                 response.resolveOk(report);
             }
@@ -160,11 +165,11 @@ export class WinterReportGenerator {
         });
     }
 
-    public static shieldRepairs(parameters: WinterReportParameters): WinterMetric {
+    private static shieldRepairs(parameters: WinterReportParameters): WinterMetric {
         return this.metric(parameters, [PsEvent.shieldRepair, PsEvent.squadShieldRepair], {
             name: "Shield Repairs",
-            funName: "DIVERT POWER",
-            description: "Most shield repair",
+            funName: "Shield Battery",
+            description: "Most shield repairs",
             entries: []
         });
     }
