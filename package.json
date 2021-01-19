@@ -1,6 +1,6 @@
 {
   "name": "topt-core",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Core of TOPT",
   "main": "build/core/index.js",
   "types": "build/core/index.d.ts",
