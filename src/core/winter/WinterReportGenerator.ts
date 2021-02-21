@@ -70,11 +70,17 @@ export class WinterReportGenerator {
         report.fun.push(this.highestHSR(parameters));
         report.fun.push(this.getDifferentWeapons(parameters));
 
-        report.fun.push(this.mostESFSKills(parameters));
-        report.fun.push(this.mostLightningKills(parameters));
-        report.fun.push(this.mostHarasserKills(parameters));
-        report.fun.push(this.mostMBTKills(parameters));
-        report.fun.push(this.mostSunderersKilled(parameters));
+        if (parameters.settings.includeVehicles == true) {
+            report.fun.push(this.mostESFSKills(parameters));
+            report.fun.push(this.mostValkKills(parameters));
+            report.fun.push(this.mostLibKills(parameters));
+            report.fun.push(this.mostGalaxyKills(parameters));
+
+            report.fun.push(this.mostHarasserKills(parameters));
+            report.fun.push(this.mostSunderersKilled(parameters));
+            report.fun.push(this.mostLightningKills(parameters));
+            report.fun.push(this.mostMBTKills(parameters));
+        }
 
         report.fun.push(this.mostRoadkills(parameters));
         report.fun.push(this.mostUsefulRevives(parameters));
@@ -171,7 +177,7 @@ export class WinterReportGenerator {
             funName: "Shield Battery",
             description: "Most shield repairs",
             entries: []
-        });
+        }, true);
     }
 
     private static kds(parameters: WinterReportParameters): WinterMetric {
@@ -461,6 +467,33 @@ export class WinterReportGenerator {
             name: "ESFs destroyed",
             funName: "Fly Swatter",
             description: "Most ESFs destroyed",
+            entries: []
+        });
+    }
+
+    private static mostValkKills(parameters: WinterReportParameters): WinterMetric {
+        return this.vehicle(parameters, [Vehicles.valkyrie], {
+            name: "Valks destroyed",
+            funName: "Valhalla wrecker",
+            description: "Most valks destroyed",
+            entries: []
+        });
+    }
+
+    private static mostLibKills(parameters: WinterReportParameters): WinterMetric {
+        return this.vehicle(parameters, [Vehicles.liberator], {
+            name: "Libs destroyed",
+            funName: "Gunships crashed",
+            description: "Most libs destroyed",
+            entries: []
+        });
+    }
+
+    private static mostGalaxyKills(parameters: WinterReportParameters): WinterMetric {
+        return this.vehicle(parameters, [Vehicles.galaxy], {
+            name: "Galaxies destroyed",
+            funName: "Quasar tsunami",
+            description: "Most galaxies destroyed",
             entries: []
         });
     }
@@ -784,13 +817,16 @@ export class WinterReportGenerator {
         return metric;
     }
 
-    private static metric(parameters: WinterReportParameters, events: string[], metric: WinterMetric): WinterMetric {
+    private static metric(parameters: WinterReportParameters, events: string[], metric: WinterMetric, debug?: boolean): WinterMetric {
         const amounts: StatMap = new StatMap();
 
         for (const player of parameters.players) {
             const evs: TEvent[] = player.events.filter(iter => iter.type == "exp" && events.indexOf(iter.expID) > -1);
             if (evs.length > 0) {
                 amounts.set(player.name, evs.length);
+                if (debug == true) {
+                    log.debug(`${player.name} got ${evs.length}`);
+                }
             }
         }
 

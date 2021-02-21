@@ -12,10 +12,16 @@ export class WinterReportParameters {
 }
 
 export class WinterReportSettings {
+
     /**
      * If the fun names will be used instead of descriptive names
      */
     public useFunNames: boolean = false;
+
+    /**
+     * If all vehicle kills will be included in the report
+     */
+    public includeVehicles: boolean = false;
 
     /**
      * How many players to show for each card

@@ -2,6 +2,7 @@ import CensusAPI from "./CensusAPI";
 import { ApiResponse } from "./ApiWrapper";
 
 import { Logger } from "../Loggers";
+import { request } from "websocket";
 const log = Logger.getLogger("FacilityAPI");
 
 export class Facility {
@@ -109,6 +110,8 @@ export class FacilityAPI {
             }
         }
 
+        log.debug(`Getting ${requestIDs.join(", ")} from census`);
+
         if (requestIDs.length > 0) {
             const request: ApiResponse<any> = CensusAPI.get(
                 `/map_region?facility_id=${requestIDs.join(",")}&c:limit=100`
@@ -116,11 +119,8 @@ export class FacilityAPI {
 
             request.ok((data: any) => {
                 if (data.returned == 0) {
-                    if (facilities.length == 0) {
-                        response.resolve({ code: 404, data: `No facilities returned from ${name}` });
-                    } else {
-                        response.resolveOk(facilities);
-                    }
+                    log.warn(`Failed to get any of ${requestIDs.join(",")} from Census`);
+                    response.resolveOk(facilities);
                 } else {
                     const bases: Facility[] = [];
                     for (const datum of data.map_region_list) {
