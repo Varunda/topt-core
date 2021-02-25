@@ -134,6 +134,11 @@ export class Core {
      */
     public connected: boolean = false;
 
+    /**
+     * If only include desolation events from the event stream
+     */
+    public desolationFilter: boolean = false;
+
     private markerCount: number = 0;
 
     public constructor(serviceID: string, serverID: string) {

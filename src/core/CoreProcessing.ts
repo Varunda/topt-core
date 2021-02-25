@@ -21,6 +21,7 @@ import {
 
 import { Logger } from "./Loggers";
 const log = Logger.getLogger("Core.Processing");
+const log2 = Logger.getLogger("Core.Processing.Trace");
 
 declare module "./Core" {
 
@@ -53,6 +54,15 @@ declare module "./Core" {
         const timestamp: number = Number.parseInt(msg.payload.timestamp) * 1000;
 
         const zoneID: string = msg.payload.zone_id;
+        if (self.desolationFilter == true && zoneID != undefined) {
+            const zoneIDN = Number.parseInt(zoneID);
+            if ((zoneIDN & 0x0000FFFF) == 0x0169) {
+                log2.debug(`Got ${event} in definition id ${zoneIDN & 0xFFFF} instance id ${(zoneIDN & 0xFFFF0000) >> 16}`);
+            } else {
+                log2.debug(`Skipped ${event} in zone ${zoneID}`);
+                return;
+            }
+        }
 
         if (event == "GainExperience") {
             const eventID: string = msg.payload.experience_id;
