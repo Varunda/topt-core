@@ -493,7 +493,7 @@ export abstract class APIWrapper<T> {
         const promise = axios.default.request({
             url: url,
             data: JSON.stringify(data),
-            validateStatus: null,
+            validateStatus: () => true,
             method: "GET"
         });
 
@@ -518,7 +518,7 @@ export abstract class APIWrapper<T> {
         const promise = axios.default.request({
             url: url,
             data: JSON.stringify(data),
-            validateStatus: null,
+            validateStatus: () => true,
             method: "GET"
         });
 
@@ -541,7 +541,7 @@ export abstract class APIWrapper<T> {
             url: url,
             responseType: "json",
             data: JSON.stringify(data),
-            validateStatus: null,
+            validateStatus: () => true,
             method: "POST"
         });
 
@@ -562,7 +562,7 @@ export abstract class APIWrapper<T> {
         const promise = axios.default.request({
             url: url,
             data: JSON.stringify(data),
-            validateStatus: null,
+            validateStatus: () => true,
             method: "POST"
         });
 
@@ -587,7 +587,7 @@ export abstract class APIWrapper<T> {
         const promise = axios.default.request({
             url: url,
             data: JSON.stringify(data),
-            validateStatus: null,
+            validateStatus: () => true,
             method: "PUT"
         });
 
@@ -609,7 +609,7 @@ export abstract class APIWrapper<T> {
         const promise = axios.default.request({
             url: url,
             data: JSON.stringify(data),
-            validateStatus: null,
+            validateStatus: () => true,
             method: "DELETE"
         });
 
