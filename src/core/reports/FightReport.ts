@@ -197,14 +197,11 @@ export class FightReportPlayer {
 
 export class FightReportGenerator {
 
-    public static generate(parameters: FightReportParameters): ApiResponse<FightReport> {
-        const response: ApiResponse<FightReport> = new ApiResponse();
-
+    public static async generate(parameters: FightReportParameters): Promise<FightReport> {
         const report: FightReport = new FightReport();
 
         if (parameters.events.length == 0 || parameters.players.size == 0) {
-            response.resolveOk(report);
-            return response;
+            return report;
         }
 
         report.startTime = new Date(parameters.events[0].timestamp);
@@ -230,106 +227,103 @@ export class FightReportGenerator {
             PsEvent.shieldRepair, PsEvent.squadShieldRepair,
         ];
 
-        FacilityAPI.getByIDs(facilityIDs).ok((facilities: Facility[]) => {
-            log.debug(`Loaded ${facilities.length} from ${facilityIDs.length} IDs`);
+        const facilities: Facility[] = await FacilityAPI.getByIDs(facilityIDs);
+        log.debug(`Loaded ${facilities.length} from ${facilityIDs.length} IDs`);
 
-            let inFight: boolean = false;
-            let entry: FightReportEntry = new FightReportEntry();
+        let inFight: boolean = false;
+        let entry: FightReportEntry = new FightReportEntry();
 
-            let alliesFound: Map<string, number> = new Map();
-            let enemiesFound: Map<string, number> = new Map();
+        let alliesFound: Map<string, number> = new Map();
+        let enemiesFound: Map<string, number> = new Map();
 
-            for (let i = 0; i < parameters.events.length; ++ i) {
-                const event: TEvent = parameters.events[i];
+        for (let i = 0; i < parameters.events.length; ++ i) {
+            const event: TEvent = parameters.events[i];
 
-                // Check if this is a fight start marker
-                if (event.type == "marker") {
-                    // Check if we're starting a fight or not
-                    if (event.mark == "battle-start") {
-                        if (inFight == false) {
-                            log.debug(`New fight started at ${event.timestamp}`);
+            // Check if this is a fight start marker
+            if (event.type == "marker") {
+                // Check if we're starting a fight or not
+                if (event.mark == "battle-start") {
+                    if (inFight == false) {
+                        log.debug(`New fight started at ${event.timestamp}`);
 
-                            entry.startTime = new Date(event.timestamp);
-                        } else {
-                            log.debug(`battle-start found without a battle-end, discarding previous fight`);
-                            entry = new FightReportEntry();
-                            entry.startTime = new Date(event.timestamp);
-                        }
-                        inFight = true;
-                    } else if (event.mark == "battle-end") {
-                        if (inFight == true) {
-                            log.debug(`Current fight ended at ${event.timestamp} (from ${entry.startTime.getTime()}), saving`);
-
-                            entry.endTime = new Date(event.timestamp);
-                            entry.duration = (event.timestamp - entry.startTime.getTime()) / 1000; // ms to seconds
-                            entry.allies = alliesFound;
-                            entry.enemies = enemiesFound;
-
-                            log.info(`#Allies: ${entry.allies.size}, #Enemies: ${entry.enemies.size}`);
-
-                            report.entries.push(this.finalizeEntry(entry, parameters, facilities));
-
-                            entry = new FightReportEntry();
-                        }
-                        inFight = false;
-                    }
-                }
-
-                // Who cares if we're not in a fight
-                if (inFight == false) {
-                    continue;
-                }
-
-                entry.events.push(event);
-
-                // Handle the event based on it's type
-                if (event.type == "kill") {
-                    ++entry.count.kills;
-                    enemiesFound.set(event.targetID, event.timestamp);
-                } else if (event.type == "death") {
-                    if (event.revived == false) {
-                        ++entry.count.deaths;
-                    }
-                    enemiesFound.set(event.targetID, event.timestamp);
-                } else if (event.type == "exp") {
-                    if (event.expID == PsEvent.heal || event.expID == PsEvent.squadHeal) {
-                        ++entry.count.heals;
-                    } else if (event.expID == PsEvent.revive || event.expID == PsEvent.squadRevive) {
-                        ++entry.count.revives;
-                    } else if (event.expID == PsEvent.squadSpawn || ["201", "233", "355", "1410"].indexOf(event.expID) > -1) {
-                        ++entry.count.spawns;
-                    }
-
-                    if (allyEventIDs.indexOf(event.expID) > -1){
-                        alliesFound.set(event.targetID, event.timestamp);
-                    }
-                } else if (event.type == "capture") {
-                    if (playerIDs.indexOf(event.sourceID) > -1) {
-                        if (entry.facilityID == null) {
-                            const fac: Facility | undefined = facilities.find(iter => iter.ID == event.facilityID);
-                            entry.name = `Successful capture of ${fac?.name ?? `bad ID ${event.facilityID}`}`;
-                            entry.facilityID = event.facilityID;
-                        } else if (entry.facilityID != event.facilityID) {
-                            log.warn(`Fight already has a name: ${entry.name}`);
-                        }
+                        entry.startTime = new Date(event.timestamp);
                     } else {
-                        //log.debug(`${event.sourceID} is not tracked, skipping`);
+                        log.debug(`battle-start found without a battle-end, discarding previous fight`);
+                        entry = new FightReportEntry();
+                        entry.startTime = new Date(event.timestamp);
                     }
-                } else if (event.type == "defend" && playerIDs.indexOf(event.sourceID) > -1) {
+                    inFight = true;
+                } else if (event.mark == "battle-end") {
+                    if (inFight == true) {
+                        log.debug(`Current fight ended at ${event.timestamp} (from ${entry.startTime.getTime()}), saving`);
+
+                        entry.endTime = new Date(event.timestamp);
+                        entry.duration = (event.timestamp - entry.startTime.getTime()) / 1000; // ms to seconds
+                        entry.allies = alliesFound;
+                        entry.enemies = enemiesFound;
+
+                        log.info(`#Allies: ${entry.allies.size}, #Enemies: ${entry.enemies.size}`);
+
+                        report.entries.push(this.finalizeEntry(entry, parameters, facilities));
+
+                        entry = new FightReportEntry();
+                    }
+                    inFight = false;
+                }
+            }
+
+            // Who cares if we're not in a fight
+            if (inFight == false) {
+                continue;
+            }
+
+            entry.events.push(event);
+
+            // Handle the event based on it's type
+            if (event.type == "kill") {
+                ++entry.count.kills;
+                enemiesFound.set(event.targetID, event.timestamp);
+            } else if (event.type == "death") {
+                if (event.revived == false) {
+                    ++entry.count.deaths;
+                }
+                enemiesFound.set(event.targetID, event.timestamp);
+            } else if (event.type == "exp") {
+                if (event.expID == PsEvent.heal || event.expID == PsEvent.squadHeal) {
+                    ++entry.count.heals;
+                } else if (event.expID == PsEvent.revive || event.expID == PsEvent.squadRevive) {
+                    ++entry.count.revives;
+                } else if (event.expID == PsEvent.squadSpawn || ["201", "233", "355", "1410"].indexOf(event.expID) > -1) {
+                    ++entry.count.spawns;
+                }
+
+                if (allyEventIDs.indexOf(event.expID) > -1){
+                    alliesFound.set(event.targetID, event.timestamp);
+                }
+            } else if (event.type == "capture") {
+                if (playerIDs.indexOf(event.sourceID) > -1) {
                     if (entry.facilityID == null) {
                         const fac: Facility | undefined = facilities.find(iter => iter.ID == event.facilityID);
-                        entry.name = `Successful defense of ${fac?.name ?? `bad ID ${event.facilityID}`}`;
+                        entry.name = `Successful capture of ${fac?.name ?? `bad ID ${event.facilityID}`}`;
                         entry.facilityID = event.facilityID;
                     } else if (entry.facilityID != event.facilityID) {
                         log.warn(`Fight already has a name: ${entry.name}`);
                     }
+                } else {
+                    //log.debug(`${event.sourceID} is not tracked, skipping`);
+                }
+            } else if (event.type == "defend" && playerIDs.indexOf(event.sourceID) > -1) {
+                if (entry.facilityID == null) {
+                    const fac: Facility | undefined = facilities.find(iter => iter.ID == event.facilityID);
+                    entry.name = `Successful defense of ${fac?.name ?? `bad ID ${event.facilityID}`}`;
+                    entry.facilityID = event.facilityID;
+                } else if (entry.facilityID != event.facilityID) {
+                    log.warn(`Fight already has a name: ${entry.name}`);
                 }
             }
+        }
 
-            response.resolveOk(report);
-        });
-
-        return response;
+        return report;
     }
 
     /**

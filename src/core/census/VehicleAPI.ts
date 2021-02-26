@@ -1,5 +1,5 @@
 import CensusAPI from "./CensusAPI";
-import { ApiResponse } from "./ApiWrapper";
+import { ApiResponse, ResponseContent } from "./ApiWrapper";
 
 import { Logger } from "../Loggers";
 const log = Logger.getLogger("VehicleAPI");
@@ -49,7 +49,7 @@ export class Vehicles {
 
 export class VehicleAPI {
 
-    private static _cache: ApiResponse<Vehicle[]> | null = null;
+    private static _cache: Promise<Vehicle[]> | null = null;
 
     public static parse(elem: any): Vehicle {
         return {
@@ -59,38 +59,39 @@ export class VehicleAPI {
         };
     }
 
-    public static getByID(vehicleID: string): ApiResponse<Vehicle | null> {
-        const response: ApiResponse<Vehicle | null> = new ApiResponse();
+    public static async getByID(vehicleID: string): Promise<Vehicle | null> {
 
-        VehicleAPI.getAll().ok((data: Vehicle[]) => {
-            let found:boolean = false;
-            for (const veh of data) {
-                if (veh.ID == vehicleID) {
-                    response.resolveOk(veh);
-                    found = true;
-                    break;
-                }
-            }
-            if (found == false) {
-                response.resolve({ code: 204, data: null });
-            }
-        });
+        const vehicles: Vehicle[] = await VehicleAPI.getAll();
 
-        return response;
+        for (const veh of vehicles) {
+            if (veh.ID == vehicleID) {
+                return veh;
+            }
+        }
+
+        return null;
     }
 
-    public static getAll(ids: string[] = []): ApiResponse<Vehicle[]> {
+    public static async getAll(ids: string[] = []): Promise<Vehicle[]> {
         if (VehicleAPI._cache == null) {
-            VehicleAPI._cache = new ApiResponse();
-            
-            const vehicles: Vehicle[] = [];
-            const response = CensusAPI.get(`vehicle?c:limit=100`);
-            response.ok((data: any) => {
-                for (const datum of data.vehicle_list) {
-                    vehicles.push(VehicleAPI.parse(datum));
+            VehicleAPI._cache = new Promise<Vehicle[]>(async (resolve, reject) => {
+                const vehicles: Vehicle[] = [];
+
+                try {
+                    const request: ResponseContent<any> = await CensusAPI.get(`vehicle?c:limit=100`).promise();
+
+                    if (request.code == 200) {
+                        for (const datum of request.data.vehicle_list) {
+                            vehicles.push(VehicleAPI.parse(datum));
+                        }
+                    } else {
+
+                    }
+
+                    return resolve(vehicles);
+                } catch (err: any) {
+                    return reject(err);
                 }
-                VehicleAPI._cache!.resolveOk(vehicles);
-                log.debug(`Cached ${vehicles.length} vehicles: [${vehicles.map(iter => iter.name).join(",")}]`);
             });
         }
 

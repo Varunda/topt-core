@@ -1,5 +1,5 @@
 import CensusAPI from "./CensusAPI";
-import { ApiResponse } from "./ApiWrapper";
+import { ApiResponse, ResponseContent } from "./ApiWrapper";
 import { CharacterAPI, Character } from "./CharacterAPI";
 
 import { Logger } from "../Loggers";
@@ -23,116 +23,141 @@ export class OutfitAPI {
         }
     }
 
-    public static getByID(ID: string): ApiResponse<Outfit | null> {
-        const response: ApiResponse<Outfit | null> = new ApiResponse();
+    public static getByID(ID: string): Promise<Outfit | null> {
+        const url: string = `/outfit/?outfit_id=${ID}&c:resolve=leader`;
 
-        const request: ApiResponse<any> = CensusAPI.get(`/outfit/?outfit_id=${ID}&c:resolve=leader`);
+        return new Promise<Outfit | null>(async (resolve, reject) => {
+            try {
+                const request: ResponseContent<any> = await CensusAPI.get(url).promise();
 
-        request.ok((data: any) => {
-            if (data.returned != 1) {
-                response.resolve({ code: 404, data: `` });
-            } else {
-                const outfit: Outfit = OutfitAPI.parse(data.outfit_list[0]);
-                response.resolveOk(outfit);
-            }
-        });
-
-        return response;
-    }
-
-    public static getByIDs(IDs: string[]): ApiResponse<Outfit[]> {
-        const response: ApiResponse<Outfit[]> = new ApiResponse();
-
-        if (IDs.length == 0) {
-            response.resolve({ code: 204, data: null });
-            return response;
-        }
-
-        IDs = IDs.filter(i => i.length > 0 && i != "0");
-        log.debug(`Loading outfits: [${IDs.join(", ")}]`);
-
-        const outfits: Outfit[] = [];
-
-        const sliceSize: number = 50;
-        let slicesLeft: number = Math.ceil(IDs.length / sliceSize);
-        log.debug(`Have ${slicesLeft} slices to do. size of ${sliceSize}, data of ${IDs.length}`);
-
-        for (let i = 0; i < IDs.length; i += sliceSize) {
-            const slice: string[] = IDs.slice(i, i + sliceSize);
-            log.trace(`slice: [${slice.join(", ")}]`);
-
-            const url: string = `/outfit/?outfit_id=${slice.join(",")}&c:resolve=leader`;
-            const request: ApiResponse<any> = CensusAPI.get(url);
-            log.trace(`made request to: '${url}'`);
-
-            request.ok((data: any) => {
-                if (data.returned == 0) {
-                } else {
-                    for (const datum of data.outfit_list) {
-                        const char: Outfit = OutfitAPI.parse(datum);
-                        outfits.push(char);
+                if (request.code == 200) {
+                    if (request.data.returned != 1) {
+                        return resolve(null);
                     }
-                }
 
-                --slicesLeft;
-                if (slicesLeft == 0) {
-                    log.debug(`No more slices left, resolving`);
-                    response.resolveOk(outfits);
+                    const outfit: Outfit = OutfitAPI.parse(request.data.outfit_list[0]);
+                    return resolve(outfit);
                 } else {
-                    log.trace(`${slicesLeft} slices left`);
+                    return reject(`API call failed>\n\t${url}\n\t${request.code} ${request.data}`);
                 }
-            }).always(() => {
-                log.debug(`${request.status}`);
-            });
-        }
-
-        return response;
-    }
-
-    public static getByTag(outfitTag: string): ApiResponse<Outfit | null> {
-        const response: ApiResponse<Outfit | null> = new ApiResponse();
-
-        const request: ApiResponse<any> = CensusAPI.get(`/outfit/?alias_lower=${outfitTag.toLocaleLowerCase()}&c:resolve=leader`);
-
-        request.ok((data: any) => {
-            if (data.returned != 1) {
-                response.resolve({ code: 404, data: `` });
-            } else {
-                const outfit: Outfit = OutfitAPI.parse(data.outfit_list[0]);
-                response.resolveOk(outfit);
+            } catch (err: any) {
+                return reject(err);
             }
         });
-
-        return response;
     }
 
-    public static getCharactersByTag(outfitTag: string): ApiResponse<Character[]> {
-        const response: ApiResponse<Character[]> = new ApiResponse();
+    public static getByIDs(IDs: string[]): Promise<Outfit[]> {
+        return new Promise<Outfit[]>(async (resolve, reject) => {
+            if (IDs.length == 0) {
+                return resolve([]);
+            }
 
-        const request: ApiResponse<any> = CensusAPI.get(`/outfit/?alias_lower=${outfitTag.toLowerCase()}&c:resolve=member_character,member_online_status`);
+            IDs = IDs.filter(i => i.length > 0 && i != "0");
+            log.debug(`Loading outfits: [${IDs.join(", ")}]`);
 
-        request.ok((data: any) => {
-            if (data.returned != 1) {
-                response.resolve({ code: 404, data: `${outfitTag} did not return 1 entry` });
-            } else {
-                // With really big outfits (3k+ members) somehow a character that doesn't exist
-                //      shows up in the query. They don't have a name, so filter them out
-                const chars: Character[] = data.outfit_list[0].members
-                    .filter((elem: any) => elem.name != undefined)
-                    .map((elem: any) => {
-                        return CharacterAPI.parseCharacter({
-                            outfit: {
-                                alias: data.outfit_list[0].alias
-                            },
-                            ...elem
+            const outfits: Outfit[] = [];
+
+            const sliceSize: number = 50;
+            let slicesLeft: number = Math.ceil(IDs.length / sliceSize);
+            log.debug(`Have ${slicesLeft} slices to do. size of ${sliceSize}, data of ${IDs.length}`);
+
+            let errors: string[] = [];
+
+            for (let i = 0; i < IDs.length; i += sliceSize) {
+                const slice: string[] = IDs.slice(i, i + sliceSize);
+                log.trace(`slice: [${slice.join(", ")}]`);
+
+                const url: string = `/outfit/?outfit_id=${slice.join(",")}&c:resolve=leader`;
+
+                try {
+                    const request: ResponseContent<any> = await CensusAPI.get(url).promise();
+
+                    if (request.code == 200) {
+                        if (request.data.returned == 0) {
+                            log.warn(`Didn't get any outfits in slice [${slice.join(", ")}]`);
+                        } else {
+                            for (const datum of request.data.outfit_list) {
+                                const outfit: Outfit = OutfitAPI.parse(datum);
+                                outfits.push(outfit);
+                            }
+                        }
+                    } else {
+                        log.warn(`API error:\n\t${url}\n\t${request.code} ${request.data}`);
+                    }
+                } catch (err: any) {
+                    errors.push(`Promise catch:\n\t${url}\n\t${err}`);
+                }
+            }
+
+            if (errors.length > 0) {
+                if (outfits.length == 0) {
+                    return reject(errors);
+                }
+                log.warn(`${errors}`);
+            }
+
+            return resolve(outfits);
+        });
+    }
+
+    public static getByTag(outfitTag: string): Promise<Outfit | null> {
+        const url: string = `/outfit/?alias_lower=${outfitTag.toLowerCase()}&c:resolve=leader`;
+
+        return new Promise<Outfit | null>(async (resolve, reject) => {
+            if (outfitTag.trim().length == 0) {
+                return resolve(null);
+            }
+
+            try {
+                const request: ResponseContent<any> = await CensusAPI.get(url).promise();
+
+                if (request.code == 200) {
+                    if (request.data.returned != 1) {
+                        return resolve(null);
+                    }
+
+                    const outfit: Outfit = OutfitAPI.parse(request.data.outfit_list[0]);
+                    return resolve(outfit);
+                } else {
+                    return reject(`API call failed>\n\t${url}\n\t${request.code} ${request.data}`);
+                }
+            } catch (err: any) {
+                return reject(err);
+            }
+        });
+    }
+
+    public static async getCharactersByTag(outfitTag: string): Promise<Character[]> {
+        const url: string = `/outfit/?alias_lower=${outfitTag.toLowerCase()}&c:resolve=member_character,member_online_status`;
+
+        return new Promise<Character[]>(async (resolve, reject) => {
+            try {
+                const request: ResponseContent<any> = await CensusAPI.get(url).promise();
+
+                if (request.code == 200) {
+                    if (request.data.returned != 1) {
+                        return reject(`Got ${request.data.returned} results when getting ${outfitTag}`);
+                    }
+
+                    const chars: Character[] = request.data.outfit_list[0].members
+                        .filter((elem: any) => elem.name != undefined)
+                        .map((elem: any) => {
+                            return CharacterAPI.parseCharacter({
+                                outfit: {
+                                    alias: request.data.outfit_list[0].alias
+                                },
+                                ...elem
+                            });
                         });
-                    });
 
-                response.resolveOk(chars);
+                    return resolve(chars);
+                } else {
+                    return reject(`API call failed>\n\t${url}\n\t${request.code} ${request.data}`);
+                }
+            } catch (err: any) {
+                return reject(err);
             }
         });
-
-        return response;
     }
 
 }

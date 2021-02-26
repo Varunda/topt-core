@@ -1,5 +1,5 @@
 import CensusAPI from "./CensusAPI";
-import { ApiResponse } from "./ApiWrapper";
+import { ApiResponse, ResponseContent } from "./ApiWrapper";
 
 import { Logger } from "../Loggers";
 const log = Logger.getLogger("CharacterAPI");
@@ -20,7 +20,7 @@ export class CharacterAPI {
 
     private static _cache: Map<string, Character | null> = new Map();
 
-    private static _pending: Map<string, ApiResponse<Character | null>> = new Map();
+    private static _pending: Map<string, Promise<Character | null>> = new Map();
 
     public static parseCharacter(elem: any): Character {
         const char: Character = {
@@ -40,38 +40,42 @@ export class CharacterAPI {
         return char;
     }
 
-    public static getByID(charID: string): ApiResponse<Character | null> {
+    public static getByID(charID: string): Promise<Character | null> {
         if (CharacterAPI._pending.has(charID)) {
             return CharacterAPI._pending.get(charID)!;
         }
 
-        const response: ApiResponse<Character | null> = new ApiResponse();
+        const url: string = `/character/?character_id=${charID}&c:resolve=outfit,online_status`;
 
-        CharacterAPI._pending.set(charID, response);
+        const prom: Promise<Character | null> = new Promise(async (resolve, reject) => {
+            if (CharacterAPI._cache.has(charID)) {
+                return resolve(CharacterAPI._cache.get(charID)!);
+            }
 
-        if (CharacterAPI._cache.has(charID)) {
-            response.resolveOk(CharacterAPI._cache.get(charID)!);
-        } else {
-            const request: ApiResponse<any> = CensusAPI.get(
-                `/character/?character_id=${charID}&c:resolve=outfit,online_status`
-            );
+            try {
+                const request: ResponseContent<any> = await CensusAPI.get(url).promise();
 
-            request.ok((data: any) => {
-                if (data.returned != 1) {
-                    response.resolve({ code: 404, data: `No or multiple characters returned from ${name}` });
+                if (request.code == 200) {
+                    if (request.data.returned != 1) {
+                        return resolve(null);
+                    }
+
+                    const char: Character = CharacterAPI.parseCharacter(request.data.character_list[0]);
+                    return resolve(char);
                 } else {
-                    response.resolveOk(CharacterAPI.parseCharacter(data.character_list[0]));
+                    return reject(`API call failed:\n\t${url}\n\t${request.code} ${request.data}`);
                 }
-            }).always(() => {
-                CharacterAPI._pending.delete(charID);
-            });
-        }
+            } catch (err: any) {
+                return reject(err);
+            }
+        });
 
-        return response;
+        CharacterAPI._pending.set(charID, prom);
+
+        return prom;
     }
 
     private static _pendingIDs: string[] = [];
-
     private static _pendingResolveID: number = 0;
 
     public static cache(charID: string): void {
@@ -83,95 +87,86 @@ export class CharacterAPI {
         CharacterAPI._pendingIDs.push(charID);
 
         if (CharacterAPI._pendingIDs.length > 9) {
-            CharacterAPI.getByIDs(CharacterAPI._pendingIDs).ok(() => {});
+            CharacterAPI.getByIDs(CharacterAPI._pendingIDs);
 
             CharacterAPI._pendingIDs = [];
         } else {
             CharacterAPI._pendingResolveID = setTimeout(() => {
-                CharacterAPI.getByIDs(CharacterAPI._pendingIDs).ok(() => {});
+                CharacterAPI.getByIDs(CharacterAPI._pendingIDs);
             }, 5000) as unknown as number;
         }
     }
 
-    public static getByIDs(charIDs: string[]): ApiResponse<Character[]> {
-        const response: ApiResponse<Character[]> = new ApiResponse();
-
-        if (charIDs.length == 0) {
-            response.resolveOk([]);
-            return response;
-        }
-
-        const chars: Character[] = [];
-        const requestIDs: string[] = [];
-
-        for (const charID of charIDs) {
-            if (CharacterAPI._cache.has(charID)) {
-                const char: Character = CharacterAPI._cache.get(charID)!;
-                chars.push(char);
-            } else {
-                requestIDs.push(charID);
+    public static getByIDs(charIDs: string[]): Promise<Character[]> {
+        return new Promise<Character[]>(async (resolve, reject) => {
+            if (charIDs.length == 0) {
+                return resolve([]);
             }
-        }
 
-        if (requestIDs.length > 0) {
-            const sliceSize: number = 50;
-            let slicesLeft: number = Math.ceil(requestIDs.length / sliceSize);
-            //log.log(`Have ${slicesLeft} slices to do. size of ${sliceSize}, data of ${requestIDs.length}`);
+            const chars: Character[] = [];
+            const requestIDs: string[] = [];
 
-            for (let i = 0; i < requestIDs.length; i += sliceSize) {
-                const slice: string[] = requestIDs.slice(i, i + sliceSize);
-                //log.log(`Slice ${i}: ${i} - ${i + sliceSize - 1}: [${slice.join(",")}]`);
+            for (const charID of charIDs) {
+                if (CharacterAPI._cache.has(charID)) {
+                    const char: Character = CharacterAPI._cache.get(charID)!;
+                    chars.push(char);
+                } else {
+                    requestIDs.push(charID);
+                }
+            }
 
-                const request: ApiResponse<any> = CensusAPI.get(
-                    `/character/?character_id=${slice.join(",")}&c:resolve=outfit,online_status`
-                );
+            if (requestIDs.length > 0) {
+                const sliceSize: number = 50;
+                let slicesLeft: number = Math.ceil(requestIDs.length / sliceSize);
+                //log.log(`Have ${slicesLeft} slices to do. size of ${sliceSize}, data of ${requestIDs.length}`);
 
-                request.ok((data: any) => {
-                    if (data.returned == 0) {
-                        if (chars.length == 0) {
-                            response.resolve({ code: 404, data: `Missing characters: ${charIDs.join(",")}` });
+                for (let i = 0; i < requestIDs.length; i += sliceSize) {
+                    const slice: string[] = requestIDs.slice(i, i + sliceSize);
+                    //log.log(`Slice ${i}: ${i} - ${i + sliceSize - 1}: [${slice.join(",")}]`);
+
+                    try {
+                        const url: string = `/character/?character_id=${slice.join(",")}&c:resolve=outfit,online_status`;
+                        const request: ResponseContent<any> = await CensusAPI.get(url).promise();
+
+                        if (request.code == 200) {
+                            for (const datum of request.data.character_list) {
+                                const char: Character = CharacterAPI.parseCharacter(datum);
+                                chars.push(char);
+                            }
                         } else {
-                            response.resolveOk(chars);
+                            log.warn(`API call failed:\n\t${url}\n\t${request.code} ${request.data}`);
                         }
-                    } else {
-                        for (const datum of data.character_list) {
-                            const char: Character = CharacterAPI.parseCharacter(datum);
-                            chars.push(char);
-                        }
+                    } catch (err: any) {
+                        log.error(err);
                     }
-
-                    --slicesLeft;
-                    if (slicesLeft == 0) {
-                        //log.log(`No more slices left, resolving`);
-                        response.resolveOk(chars);
-                    } else {
-                        //log.log(`${slicesLeft} slices left`);
-                    }
-                });
-            }
-        } else {
-            response.resolveOk(chars);
-        }
-
-        return response;
-    }
-
-    public static getByName(name: string): ApiResponse<Character | null> {
-        const response: ApiResponse<Character | null> = new ApiResponse();
-
-        const request: ApiResponse<any> = CensusAPI.get(
-            `/character/?name.first_lower=${name.toLowerCase()}&c:resolve=outfit,online_status`
-        );
-
-        request.ok((data: any) => {
-            if (data.returned != 1) {
-                response.resolve({ code: 404, data: `No or multiple characters returned from ${name}` });
+                }
             } else {
-                response.resolveOk(CharacterAPI.parseCharacter(data.character_list[0]));
+                return resolve(chars);
             }
         });
+    }
 
-        return response;
+    public static getByName(name: string): Promise<Character | null> {
+        const url: string = `/character/?name.first_lower=${name.toLowerCase()}&c:resolve=outfit,online_status`;
+
+        return new Promise<Character | null>(async (resolve, reject) => {
+            try {
+                const request: ResponseContent<any> = await CensusAPI.get(url).promise();
+
+                if (request.code == 200) {
+                    if (request.data.returned != 1) {
+                        return resolve(null);
+                    }
+
+                    const char: Character = CharacterAPI.parseCharacter(request.data.character_list[0]);
+                    return resolve(char);
+                } else {
+                    return reject(`API call failed:\n\t${url}\n\t${request.code} ${request.data}`);
+                }
+            } catch (err: any) {
+                return reject(err);
+            }
+        });
     }
 
 }

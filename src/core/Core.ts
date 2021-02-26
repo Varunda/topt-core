@@ -150,6 +150,8 @@ export class Core {
         CensusAPI.init(this.serviceID);
 
         this.squadInit();
+
+        log.info(`Using Promise core`);
     }
 
     /**
@@ -282,28 +284,22 @@ export class Core {
      * 
      * @returns An ApiResponse that will resolve when the outfit has been loaded
      */
-    public addOutfit(tag: string): ApiResponse {
+    public async addOutfit(tag: string): Promise<void> {
         if (this.connected == false) {
             throw `Cannot track outfit ${tag}: Core is not connected`;
         }
 
-        const response: ApiResponse = new ApiResponse();
+        try {
+            const outfit: Outfit | null = await OutfitAPI.getByTag(tag);
+            if (outfit != null) {
+                this.outfits.push(outfit);
+            }
 
-        if (tag.trim().length == 0) {
-            response.resolveOk();
-            return response;
+            const chars: Character[] = await OutfitAPI.getCharactersByTag(tag);
+            this.subscribeToEvents(chars);
+        } catch (err: any) {
+            log.error(err);
         }
-
-        OutfitAPI.getByTag(tag).ok((data: Outfit) => {
-            this.outfits.push(data);
-        });
-
-        OutfitAPI.getCharactersByTag(tag).ok((data: Character[]) => {
-            this.subscribeToEvents(data);
-            response.resolveOk();
-        });
-
-        return response;
     }
 
     /**
@@ -313,23 +309,17 @@ export class Core {
      * 
      * @returns An ApiResponse that will resolve when the character has been loaded and tracked
      */
-    public addPlayer(name: string): ApiResponse {
+    public async addPlayer(name: string): Promise<void> {
         if (this.connected == false) {
             throw `Cannot track character ${name}: Core is not connected`;
         }
 
-        const response: ApiResponse = new ApiResponse();
-
-        if (name.trim().length == 0) {
-            response.resolveOk();
-        } else {
-            CharacterAPI.getByName(name).ok((data: Character) => {
-                this.subscribeToEvents([data]);
-                response.resolveOk();
-            });
+        if (name.trim().length > 0) {
+            const char: Character | null = await CharacterAPI.getByName(name);
+            if (char != null) {
+                this.subscribeToEvents([char]);
+            }
         }
-
-        return response;
     }
 
     /**
@@ -339,25 +329,19 @@ export class Core {
      * 
      * @returns An ApiResponse that will resolve when the character has been loaded and tracked
      */
-    public addPlayerByID(charID: string): ApiResponse {
+    public async addPlayerByID(charID: string): Promise<void> {
         if (this.connected == false) {
-            throw `Cannot tracker character ${charID}: Core is not connected`;
+            throw `Cannot track character ${charID}: Core is not connected`;
         }
 
-        const response: ApiResponse = new ApiResponse();
-
-        if (charID.trim().length == 0) {
-            response.resolveOk();
-        } else {
-            CharacterAPI.getByID(charID).ok((data: Character) => {
-                this.subscribeToEvents([data]);
-                response.resolveOk();
-            }).notFound((err: string) => {
-                response.resolve({ code: 500, data: `Character ID ${charID} does not exist` });
-            });
+        if (charID.trim().length > 0) {
+            const char: Character | null = await CharacterAPI.getByID(charID);
+            if (char != null) {
+                this.subscribeToEvents([char]);
+            } else {
+                log.warn(`Failed to get ${charID} from CharacterAPI`);
+            }
         }
-
-        return response;
     }
 
     /**

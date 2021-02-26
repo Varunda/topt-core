@@ -23,22 +23,21 @@ import * as fs from "fs";
 import Core, { ApiResponse, Playback, PlaybackOptions } from "../core/index";
 
 test("MedicHealStreak", () => {
-    const promise = new Promise((resolve, reject) => {
+    const promise = new Promise<void>((resolve, reject) => {
         const core: Core = new Core("asdf", "1");
         core.connect().ok(() => {
             Playback.setCore(core);
 
-            fs.readFile("./src/tests/test-data.json", (err, data: Buffer) => {
-                Playback.loadFile(data.toString()).ok(() => {
-                    Playback.start({
-                        speed: 0
-                    });
-
-                    expect(true);
-
-                    core.disconnect();
-                    resolve();
+            fs.readFile("./src/tests/test-data.json", async (err, data: Buffer) => {
+                await Playback.loadFile(data.toString());
+                Playback.start({
+                    speed: 0
                 });
+
+                expect(true);
+
+                core.disconnect();
+                return resolve();
             });
         });
     });

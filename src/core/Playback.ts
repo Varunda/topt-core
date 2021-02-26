@@ -25,37 +25,27 @@ export class Playback {
         Playback._core = core;
     }
 
-    public static loadFile(file: File | string): ApiResponse {
+    public static async loadFile(file: File | string): Promise<void> {
         if (Playback._core == null) {
             throw `Cannot load file: Core has not been set. Did you forget to use Playback.setCore()?`;
         }
 
-        const response: ApiResponse = new ApiResponse();
-
         if (typeof(file) == "string") {
             log.debug(`using a string`);
-            this.process(file).ok(() => {
-                response.resolveOk();
-            });
+            await this.process(file);
         } else {
             log.debug(`using a file`);
             const reader: FileReader = new FileReader();
 
-            reader.onload = ((ev: ProgressEvent<FileReader>) => {
-                this.process(reader.result as string).ok(() => {
-                    response.resolveOk();
-                });
+            reader.onload = (async (ev: ProgressEvent<FileReader>) => {
+                await this.process(reader.result as string)
             });
 
             reader.readAsText(file);
         }
-
-        return response;
     }
 
-    private static process(str: string): ApiResponse {
-        const response: ApiResponse = new ApiResponse();
-
+    private static async process(str: string): Promise<void> {
         const data: any = JSON.parse(str);
 
         if (!data.version) {
@@ -89,24 +79,15 @@ export class Playback {
                     outfitIDs = (outfits as Outfit[]).map(iter => iter.ID);
                 }
 
-                OutfitAPI.getByIDs(outfitIDs).ok((data: Outfit[]) => {
-                    this._core!.outfits = data;
-                    log.info(`From [${outfitIDs.join(", ")}] loaded: ${JSON.stringify(data)}`);
-                }).always(() => {
-                    log.debug(`Took ${new Date().getTime() - nowMs}ms to import data`);
-                    response.resolveOk();
-                });
-            } else {
-                log.debug(`Took ${new Date().getTime() - nowMs}ms to import data`);
-                response.resolveOk();
+                const data: Outfit[] = await OutfitAPI.getByIDs(outfitIDs);
+                this._core!.outfits = data;
+                log.info(`From [${outfitIDs.join(", ")}] loaded: ${JSON.stringify(data)}`);
             }
 
+            log.debug(`Took ${new Date().getTime() - nowMs}ms to import data`);
         } else {
             log.error(`Unchecked version: ${data.version}`);
-            response.resolve({ code: 400, data: `` });
         }
-
-        return response;
     }
 
     public static start(parameters: PlaybackOptions): void {

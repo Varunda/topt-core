@@ -36,9 +36,7 @@ export class WinterMetricIndex {
 
 export class WinterReportGenerator {
 
-    public static generate(parameters: WinterReportParameters): ApiResponse<WinterReport> {
-        const response: ApiResponse<WinterReport> = new ApiResponse();
-
+    public static async generate(parameters: WinterReportParameters): Promise<WinterReport> {
         parameters.events = parameters.events.sort((a, b) => a.timestamp - b.timestamp);
 
         const report: WinterReport = new WinterReport();
@@ -95,35 +93,23 @@ export class WinterReportGenerator {
         report.fun.push(this.mostRouterSpawns(parameters));
         report.fun.push(this.longestHealStreak(parameters));
 
-        let opsLeft: number = 
-            + 1     // Knife kills
-            + 1     // Pistol kills
-            + 1     // Grenade kills
-            ;
+        report.fun.push(await this.mostKnifeKills(parameters));
+        report.fun.push(await this.mostGrenadeKills(parameters));
+        report.fun.push(await this.mostPistolKills(parameters));
 
-        const handler = () => {
-            if (--opsLeft == 0) {
-                if (parameters.settings.funMetricCount != -1) {
-                    // Shuffle array
-                    for (let i = report.fun.length - 1; i > 0; i--) {
-                        const elem = Math.floor(Math.random() * (i + 1));
-                        [report.fun[i], report.fun[elem]] = [report.fun[elem], report.fun[i]];
-                    }
-
-                    report.fun = report.fun.slice(0, parameters.settings.funMetricCount);
-                }
-
-                log.debug(`Loaded ${report.fun.length} fun metrics`);
-
-                response.resolveOk(report);
+        if (parameters.settings.funMetricCount != -1) {
+            // Shuffle array
+            for (let i = report.fun.length - 1; i > 0; i--) {
+                const elem = Math.floor(Math.random() * (i + 1));
+                [report.fun[i], report.fun[elem]] = [report.fun[elem], report.fun[i]];
             }
+
+            report.fun = report.fun.slice(0, parameters.settings.funMetricCount);
         }
 
-        this.mostKnifeKills(parameters).ok(data => report.fun.push(data)).always(handler);
-        this.mostGrenadeKills(parameters).ok(data => report.fun.push(data)).always(handler);
-        this.mostPistolKills(parameters).ok(data => report.fun.push(data)).always(handler);
+        log.debug(`Loaded ${report.fun.length} fun metrics`);
 
-        return response;
+        return report;
     }
 
     private static revives(parameters: WinterReportParameters): WinterMetric {
@@ -690,7 +676,7 @@ export class WinterReportGenerator {
         return metric;
     }
 
-    private static mostKnifeKills(parameters: WinterReportParameters): ApiResponse<WinterMetric> {
+    private static mostKnifeKills(parameters: WinterReportParameters): Promise<WinterMetric> {
         return this.weaponType(parameters, "Knife", {
             name: "Knife kills",
             funName: "Slasher",
@@ -708,7 +694,7 @@ export class WinterReportGenerator {
         });
     }
 
-    private static mostGrenadeKills(parameters: WinterReportParameters): ApiResponse<WinterMetric> {
+    private static mostGrenadeKills(parameters: WinterReportParameters): Promise<WinterMetric> {
         return this.weaponType(parameters, "Grenade", {
             name: "Grenade kills",
             funName: "Hot Potato",
@@ -717,7 +703,7 @@ export class WinterReportGenerator {
         });
     }
 
-    private static mostPistolKills(parameters: WinterReportParameters): ApiResponse<WinterMetric> {
+    private static mostPistolKills(parameters: WinterReportParameters): Promise<WinterMetric> {
         return this.weaponType(parameters, "Pistol", {
             name: "Pistol kills",
             funName: "The Cowboy",
@@ -726,9 +712,7 @@ export class WinterReportGenerator {
         });
     }
 
-    private static weaponType(parameters: WinterReportParameters, type: string, metric: WinterMetric): ApiResponse<WinterMetric> {
-        const response: ApiResponse<WinterMetric> = new ApiResponse();
-
+    private static async weaponType(parameters: WinterReportParameters, type: string, metric: WinterMetric): Promise<WinterMetric> {
         const wepIDs: Set<string> = new Set();
 
         for (const player of parameters.players) {
@@ -741,29 +725,26 @@ export class WinterReportGenerator {
         }
 
         const amounts: StatMap = new StatMap();
+        const weapons: Weapon[] = await WeaponAPI.getByIDs(Array.from(wepIDs.keys()));
 
-        WeaponAPI.getByIDs(Array.from(wepIDs.keys())).ok((data: Weapon[]) => {
-            for (const player of parameters.players) {
-                const kills: TKillEvent[] = player.events.filter(iter => iter.type == "kill") as TKillEvent[];
+        for (const player of parameters.players) {
+            const kills: TKillEvent[] = player.events.filter(iter => iter.type == "kill") as TKillEvent[];
 
-                for (const kill of kills) {
-                    const weapon: Weapon | undefined = data.find(iter => iter.ID == kill.weaponID);
-                    if (weapon == undefined) {
-                        continue;
-                    }
+            for (const kill of kills) {
+                const weapon: Weapon | undefined = weapons.find(iter => iter.ID == kill.weaponID);
+                if (weapon == undefined) {
+                    continue;
+                }
 
-                    if (weapon.type == type) {
-                        amounts.increment(player.name);
-                    }
+                if (weapon.type == type) {
+                    amounts.increment(player.name);
                 }
             }
+        }
 
-            metric.entries = this.statMapToEntires(parameters, amounts);
-        });
+        metric.entries = this.statMapToEntires(parameters, amounts);
 
-        response.resolveOk(metric);
-
-        return response;
+        return metric;
     }
 
     private static weapon(parameters: WinterReportParameters, ids: string[], metric: WinterMetric): WinterMetric {

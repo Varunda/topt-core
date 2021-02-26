@@ -262,32 +262,12 @@ export class ReportParameters {
 
 export class IndividualReporter {
 
-    public static generatePersonalReport(parameters: ReportParameters): ApiResponse<Report> {
-        const response: ApiResponse<Report> = new ApiResponse();
-
+    public static async generatePersonalReport(parameters: ReportParameters): Promise<Report> {
         if (parameters.player.events.length == 0) {
-            response.resolve({ code: 400, data: "No events for player, cannot generate" });
-            return response;
+            return new Report();
         }
 
         const report: Report = new Report();
-
-        let opsLeft: number = 
-            //1       // Transport assists
-            + 1     // Supported by
-            + 1     // Misc collection
-            + 1     // Weapon kills
-            + 1     // Weapon type kills
-            + 1     // Weapon deaths
-            + 1     // Weapon death types
-            + 1     // Ribbons
-            + 1     // Medic breakdown
-            + 1     // Engineer breakdown
-            + 1     // Player versus
-            + 1     // Weapon HS breakdown
-        ;
-
-        const totalOps: number = opsLeft;
 
         const firstPlayerEvent: TEvent = parameters.player.events[0];
         const lastPlayerEvent: TEvent = parameters.player.events[parameters.player.events.length - 1];
@@ -302,9 +282,7 @@ export class IndividualReporter {
 
         report.player.stats.getMap().forEach((value: number, eventID: string) => {
             const event: PsEvent | undefined = PsEvents.get(eventID);
-            if (event == undefined) {
-                return;
-            }
+            if (event == undefined) { return; }
 
             report.stats.set(event.name, `${value}`);
             report.player?.stats.set(event.name, value);
@@ -317,370 +295,238 @@ export class IndividualReporter {
 
         report.logistics.routers = IndividualReporter.routerBreakdown(parameters);
 
-        const callback = (step: string) => {
-            return () => {
-                log.debug(`Finished ${step}: Have ${opsLeft - 1} ops left outta ${totalOps}`);
-                if (--opsLeft == 0) {
-                    response.resolveOk(report);
-                }
-            }
-        }
+        report.collections.push(await IndividualReporter.supportedBy(parameters));
+        report.collections.push(await IndividualReporter.miscCollection(parameters));
 
-        IndividualReporter.supportedBy(parameters)
-            .ok(data => report.collections.push(data)).always(callback("Supported by"));
-        IndividualReporter.miscCollection(parameters)   
-            .ok(data => report.collections.push(data)).always(callback("Misc coll"));
+        report.weaponHeadshotBreakdown = await EventReporter.weaponHeadshot(parameters.player.events);
+        report.weaponKillBreakdown = await EventReporter.weaponKills(parameters.player.events);
+        report.weaponKillTypeBreakdown = await EventReporter.weaponTypeKills(parameters.player.events);
+        report.weaponDeathBreakdown = await EventReporter.weaponDeaths(parameters.player.events);
+        report.weaponDeathTypeBreakdown = await EventReporter.weaponTypeDeaths(parameters.player.events, "unrevived");
 
-        EventReporter.weaponHeadshot(parameters.player.events)
-            .ok(data => report.weaponHeadshotBreakdown = data).always(callback("Weapon headshots"));
-        EventReporter.weaponKills(parameters.player.events)
-            .ok(data => report.weaponKillBreakdown = data).always(callback("Weapon kills"));
-        EventReporter.weaponTypeKills(parameters.player.events)
-            .ok(data => report.weaponKillTypeBreakdown = data).always(callback("Weapon type kills"));
-        EventReporter.weaponDeaths(parameters.player.events)
-            .ok(data => report.weaponDeathBreakdown = data).always(callback("Weapon deaths"));
-        EventReporter.weaponTypeDeaths(parameters.player.events)
-            .ok(data => report.weaponDeathTypeBreakdown = data).always(callback("Weapon type deaths"));
-
-        IndividualReporter.playerVersus(parameters).ok(data => report.playerVersus = data).always(callback("Player versus"));
+        report.playerVersus = await IndividualReporter.playerVersus(parameters);
 
         report.overtime.kd = EventReporter.kdOverTime(parameters.player.events);
+        report.perUpdate.kd = EventReporter.kdPerUpdate(parameters.player.events);
         report.overtime.kpm = EventReporter.kpmOverTime(parameters.player.events);
 
         if (parameters.player.events.find(iter => iter.type == "exp" && (iter.expID == PsEvent.revive || iter.expID == PsEvent.squadRevive)) != undefined) {
             report.overtime.rpm = EventReporter.revivesOverTime(parameters.player.events);
         }
 
-        report.perUpdate.kd = EventReporter.kdPerUpdate(parameters.player.events);
-
         const ribbonIDs: string[] = Array.from(parameters.player.ribbons.getMap().keys());
         if (ribbonIDs.length > 0) {
-            AchievementAPI.getByIDs(ribbonIDs).ok((data: Achievement[]) => {
-                report.player?.ribbons.getMap().forEach((amount: number, achivID: string) => {
-                    const achiv = data.find((iter: Achievement) => iter.ID == achivID) || AchievementAPI.unknown;
-                    const entry: CountedRibbon = {
-                        ...achiv,
-                        amount: amount
-                    };
+            const data: Achievement[] = await AchievementAPI.getByIDs(ribbonIDs);
+            report.player?.ribbons.getMap().forEach((amount: number, achivID: string) => {
+                const achiv = data.find((iter: Achievement) => iter.ID == achivID) || AchievementAPI.unknown;
+                const entry: CountedRibbon = {
+                    ...achiv,
+                    amount: amount
+                };
 
-                    report.ribbonCount += amount;
-                    report.ribbons.push(entry);
-                });
-
-                report.ribbons.sort((a, b) => {
-                    return (b.amount - a.amount) || b.name.localeCompare(a.name);
-                });
-            }).always(() => {
-                callback("Ribbons")();
+                report.ribbonCount += amount;
+                report.ribbons.push(entry);
             });
-        } else {
-            callback("Ribbons")();
+
+            report.ribbons.sort((a, b) => (b.amount - a.amount) || b.name.localeCompare(a.name))
         }
 
         if (report.classBreakdown.medic.secondsAs > 10) {
-            IndividualReporter.medicBreakdown(parameters)
-                .ok(data => report.breakdowns.push(data)).always(callback("Medic breakdown"));
-        } else {
-            callback("Medic breakdown")();
+            report.breakdowns.push(await IndividualReporter.medicBreakdown(parameters));
         }
 
         if (report.classBreakdown.engineer.secondsAs > 10) {
-            IndividualReporter.engineerBreakdown(parameters)   
-                .ok(data => report.breakdowns.push(data)).always(callback("Eng breakdown"));
-        } else {
-            callback("Eng breakdown")();
+            report.breakdowns.push(await IndividualReporter.engineerBreakdown(parameters));
         }
 
-        return response;
+        return report;
     }
 
-    public static playerVersus(parameters: ReportParameters): ApiResponse<PlayerVersus[]> {
-        const response: ApiResponse<PlayerVersus[]> = new ApiResponse();
-
+    public static async playerVersus(parameters: ReportParameters): Promise<PlayerVersus[]> {
         const versus: PlayerVersus[] = [];
 
-        const charIDs: string[] = [];
-        const wepIDs: string[] = [];
+        const charIDs: Set<string> = new Set();
+        const wepIDs: Set<string> = new Set();
 
         for (const ev of parameters.player.events) {
-            if (ev.sourceID != parameters.player.characterID) {
-                continue;
-            }
+            if (ev.sourceID != parameters.player.characterID) { continue; }
+            if (ev.type != "kill" && ev.type != "death") { continue; }
 
-            if (ev.type != "kill" && ev.type != "death") {
-                continue;
-            }
-
-            charIDs.push(ev.targetID);
-            wepIDs.push(ev.weaponID);
+            charIDs.add(ev.targetID);
+            wepIDs.add(ev.weaponID);
         }
-
-        let characters: Character[] = [];
-        let weapons: Weapon[] = [];
-
-        let opsLeft: number = 2;
 
         const killsMap: Map<string, StatMap> = new Map();
         const deathsMap: Map<string, StatMap> = new Map();
 
-        const done = () => {
-            for (const ev of parameters.player.events) {
-                if (ev.sourceID != parameters.player.characterID) {
-                    continue;
-                }
+        const characters: Character[] = await CharacterAPI.getByIDs(Array.from(charIDs.values()));
+        const weapons: Weapon[] = await WeaponAPI.getByIDs(Array.from(wepIDs.values()));
 
-                if (ev.type != "kill" && ev.type != "death") {
-                    continue;
-                }
+        for (const ev of parameters.player.events) {
+            if (ev.sourceID != parameters.player.characterID) { continue; }
+            if (ev.type != "kill" && ev.type != "death") { continue; }
 
-                let entry: PlayerVersus | undefined = versus.find(iter => iter.charID == ev.targetID);
-                if (entry == undefined) {
-                    entry = new PlayerVersus();
-                    entry.charID = ev.targetID;
-                    entry.name = characters.find(iter => iter.ID == ev.targetID)?.name ?? `Unknown ${ev.targetID}`;
+            let entry: PlayerVersus | undefined = versus.find(iter => iter.charID == ev.targetID);
+            if (entry == undefined) {
+                entry = new PlayerVersus();
+                entry.charID = ev.targetID;
+                entry.name = characters.find(iter => iter.ID == ev.targetID)?.name ?? `Unknown ${ev.targetID}`;
 
-                    killsMap.set(ev.targetID, new StatMap());
-                    deathsMap.set(ev.targetID, new StatMap());
+                killsMap.set(ev.targetID, new StatMap());
+                deathsMap.set(ev.targetID, new StatMap());
 
-                    versus.push(entry);
-                }
+                versus.push(entry);
+            }
 
-                const weaponName: string = weapons.find(iter => iter.ID == ev.weaponID)?.name ?? `Unknown ${ev.weaponID}`;
+            const weaponName: string = weapons.find(iter => iter.ID == ev.weaponID)?.name ?? `Unknown ${ev.weaponID}`;
 
-                let type: "kill" | "death" | "revived" | "unknown" = "unknown";
-                if (ev.type == "kill") {
-                    ++entry.kills;
-                    type = "kill";
-                    killsMap.get(ev.targetID)!.increment(weaponName);
-                } else if (ev.type == "death") {
-                    if (ev.revived == true) {
-                        ++entry.revives;
-                        type = "revived";
-                    } else {
-                        ++entry.deaths;
-                        type = "death";
-                        deathsMap.get(ev.targetID)!.increment(weaponName);
-                    }
+            let type: "kill" | "death" | "revived" | "unknown" = "unknown";
+            if (ev.type == "kill") {
+                ++entry.kills;
+                type = "kill";
+                killsMap.get(ev.targetID)!.increment(weaponName);
+            } else if (ev.type == "death") {
+                if (ev.revived == true) {
+                    ++entry.revives;
+                    type = "revived";
                 } else {
-                    log.error(`Unchecked event type: '${ev}'`);
+                    ++entry.deaths;
+                    type = "death";
+                    deathsMap.get(ev.targetID)!.increment(weaponName);
                 }
-
-                const encounter: PlayerVersusEntry = {
-                    timestamp: ev.timestamp,
-                    headshot: ev.isHeadshot,
-                    type: type,
-                    weaponName: weapons.find(iter => iter.ID == ev.weaponID)?.name ?? `Unknown ${ev.weaponID}`
-                };
-
-                entry.encounters.push(encounter);
+            } else {
+                log.error(`Unchecked event type: '${ev}'`);
             }
 
-            for (const entry of versus) {
-                if (killsMap.has(entry.charID) == false) {
-                    log.error(`Missing killsMap entry for ${entry.name}`);
-                    continue;
-                }
-                if (deathsMap.has(entry.charID) == false) {
-                    log.error(`Missing deathsMap entry for ${entry.name}`);
-                    continue;
-                }
+            const encounter: PlayerVersusEntry = {
+                timestamp: ev.timestamp,
+                headshot: ev.isHeadshot,
+                type: type,
+                weaponName: weapons.find(iter => iter.ID == ev.weaponID)?.name ?? `Unknown ${ev.weaponID}`
+            };
 
-                const killMap: StatMap = killsMap.get(entry.charID)!;
-                const deathMap: StatMap = deathsMap.get(entry.charID)!;
+            entry.encounters.push(encounter);
+        }
 
-                const killBreakdown: BreakdownArray = new BreakdownArray();
-                killMap.getMap().forEach((amount: number, weapon: string) => {
-                    killBreakdown.data.push({
-                        display: weapon,
-                        amount: amount,
-                        sortField: weapon,
-                        color: undefined
-                    });
+        for (const entry of versus) {
+            if (killsMap.has(entry.charID) == false) {
+                log.error(`Missing killsMap entry for ${entry.name}`);
+                continue;
+            }
+            if (deathsMap.has(entry.charID) == false) {
+                log.error(`Missing deathsMap entry for ${entry.name}`);
+                continue;
+            }
 
-                    killBreakdown.total += amount;
+            const killMap: StatMap = killsMap.get(entry.charID)!;
+            const deathMap: StatMap = deathsMap.get(entry.charID)!;
+
+            const killBreakdown: BreakdownArray = new BreakdownArray();
+            killMap.getMap().forEach((amount: number, weapon: string) => {
+                killBreakdown.data.push({
+                    display: weapon,
+                    amount: amount,
+                    sortField: weapon,
+                    color: undefined
                 });
-                entry.weaponKills = killBreakdown;
 
-                const deathBreakdown: BreakdownArray = new BreakdownArray();
-                deathMap.getMap().forEach((amount: number, weapon: string) => {
-                    deathBreakdown.data.push({
-                        display: weapon,
-                        amount: amount,
-                        sortField: weapon,
-                        color: undefined
-                    });
+                killBreakdown.total += amount;
+            });
+            entry.weaponKills = killBreakdown;
 
-                    deathBreakdown.total += amount;
+            const deathBreakdown: BreakdownArray = new BreakdownArray();
+            deathMap.getMap().forEach((amount: number, weapon: string) => {
+                deathBreakdown.data.push({
+                    display: weapon,
+                    amount: amount,
+                    sortField: weapon,
+                    color: undefined
                 });
-                entry.weaponDeaths = deathBreakdown;
-            }
 
-            response.resolveOk(versus);
-        };
+                deathBreakdown.total += amount;
+            });
+            entry.weaponDeaths = deathBreakdown;
+        }
 
-        CharacterAPI.getByIDs(charIDs).ok((data: Character[]) => {
-            characters = data;
-            if (--opsLeft == 0) { done(); }
-        });
-
-        WeaponAPI.getByIDs(wepIDs).ok((data: Weapon[]) => {
-            weapons = data;
-            if (--opsLeft == 0) { done(); }
-        });
-
-        return response;
+        return versus;
     }
 
-    private static medicBreakdown(parameters: ReportParameters): ApiResponse<BreakdownCollection> {
-        const response: ApiResponse<BreakdownCollection> = new ApiResponse();
+    private static async medicBreakdown(parameters: ReportParameters): Promise<BreakdownCollection> {
+        const coll: BreakdownCollection = new BreakdownCollection();
+        coll.title = "Medic";
 
-        const medicCollection: BreakdownCollection = new BreakdownCollection();
-        medicCollection.title = "Medic";
+        coll.sections.push(await IndividualReporter.breakdownSection(parameters, "Heal ticks", PsEvent.heal, PsEvent.squadHeal));
+        coll.sections.push(await IndividualReporter.breakdownSection(parameters, "Revives", PsEvent.revive, PsEvent.squadRevive));
+        coll.sections.push(await IndividualReporter.breakdownSection(parameters, "Shield repair ticks", PsEvent.shieldRepair, PsEvent.squadShieldRepair));
 
-        let opsLeft: number = 
-            1       // Heals
-            + 1     // Revives
-            + 1;    // Shield repair
-
-        const add = (data: BreakdownSection) => {
-            medicCollection.sections.push(data);
-        }
-
-        const callback = () => {
-            if (--opsLeft == 0) {
-                response.resolveOk(medicCollection);
-            }
-        }
-
-        IndividualReporter.breakdownSection(parameters, "Heal ticks", PsEvent.heal, PsEvent.squadHeal).ok(add).always(callback);
-        IndividualReporter.breakdownSection(parameters, "Revives", PsEvent.revive, PsEvent.squadRevive).ok(add).always(callback);
-        IndividualReporter.breakdownSection(parameters, "Shield repair ticks", PsEvent.shieldRepair, PsEvent.squadShieldRepair).ok(add).always(callback);
-
-        return response;
+        return coll;
     }
 
-    private static engineerBreakdown(parameters: ReportParameters): ApiResponse<BreakdownCollection> {
-        const response: ApiResponse<BreakdownCollection> = new ApiResponse();
+    private static async engineerBreakdown(parameters: ReportParameters): Promise<BreakdownCollection> {
+        const coll: BreakdownCollection = new BreakdownCollection();
 
-        const engCollection: BreakdownCollection = new BreakdownCollection();
-        engCollection.title = "Engineer";
+        coll.title = "Engineer";
+        coll.sections.push(await IndividualReporter.breakdownSection(parameters, "Resupply ticks", PsEvent.resupply, PsEvent.squadResupply));
+        coll.sections.push(await IndividualReporter.breakdownSection(parameters, "MAX repair ticks", PsEvent.maxRepair, PsEvent.squadMaxRepair));
 
-        let opsLeft: number = 
-            1       // Resupply
-            + 1;    // Repair MAX
-
-        const add = (data: BreakdownSection) => {
-            engCollection.sections.push(data);
-        }
-
-        const callback = () => {
-            if (--opsLeft == 0) {
-                response.resolveOk(engCollection);
-            }
-        }
-
-        IndividualReporter.breakdownSection(parameters, "Resupply ticks", PsEvent.resupply, PsEvent.squadResupply).ok(add).always(callback);
-        IndividualReporter.breakdownSection(parameters, "MAX repair ticks", PsEvent.maxRepair, PsEvent.squadMaxRepair).ok(add).always(callback);
-
-        return response;
+        return coll;
     }
 
-    private static breakdownSection(parameters: ReportParameters, name: string, expID: string, squadExpID: string): ApiResponse<BreakdownSection> {
-        const response: ApiResponse<BreakdownSection> = new ApiResponse();
-
+    private static async breakdownSection(parameters: ReportParameters, name: string, expID: string, squadExpID: string): Promise<BreakdownSection> {
         const ticks: TExpEvent[] = parameters.player.events.filter(iter => iter.type == "exp" && iter.expID == expID) as TExpEvent[];
-        if (ticks.length > 0) {
-            const section: BreakdownSection = new BreakdownSection();
-            section.title = name;
 
-            let opsLeft: number = 2;
+        const section: BreakdownSection = new BreakdownSection();
+        section.title = name;
 
-            const callback = () => {
-                if (--opsLeft == 0) {
-                    response.resolveOk(section);
-                }
-            }
+        section.left = new BreakdownMeta();
+        section.left.title = "All";
+        section.left.data = await EventReporter.experience(expID, ticks);
 
-            section.left = new BreakdownMeta();
-            section.left.title = "All";
-            EventReporter.experience(expID, ticks).ok((data: BreakdownArray) => {
-                section.left!.data = data;
-            }).always(callback);
+        section.right = new BreakdownMeta();
+        section.right.title = "Squad only";
+        section.right.data = await EventReporter.experience(squadExpID, ticks);
 
-            section.right = new BreakdownMeta();
-            section.right.title = "Squad only";
-            EventReporter.experience(squadExpID, ticks).ok((data: BreakdownArray) => {
-                section.right!.data = data;
-            }).always(callback);
-        } else {
-            response.resolve({ code: 204, data: null });
-        }
-
-        return response;
+        return section;
     }
 
-    private static miscCollection(parameters: ReportParameters): ApiResponse<BreakdownSingleCollection> {
-        const response: ApiResponse<BreakdownSingleCollection> = new ApiResponse();
-
+    private static miscCollection(parameters: ReportParameters): BreakdownSingleCollection {
         const coll: BreakdownSingleCollection = {
             header: "Misc",
             metas: []
         }
-
-        let opsLeft: number = 
-            1;      // Deployabled destroyed
 
         const dep = IndividualReporter.deployableDestroyedBreakdown(parameters);
         if (dep != null) {
             coll.metas.push(dep);
         }
 
-        if (coll.metas.length > 0) {
-            response.resolveOk(coll);
-        } else {
-            response.resolve({ code: 204, data: null });
-        }
-
-        return response;
+        return coll;
     }
 
-    private static supportedBy(parameters: ReportParameters): ApiResponse<BreakdownSingleCollection> {
-        const response: ApiResponse<BreakdownSingleCollection> = new ApiResponse();
-
+    private static async supportedBy(parameters: ReportParameters): Promise<BreakdownSingleCollection> {
         const coll: BreakdownSingleCollection = {
             header: "Supported by",
             metas: []
         };
 
-        let opsLeft: number = 
-            1       // Healed by
-            + 1     // Revived by
-            + 1     // Shield repaired by
-            + 1     // Resupplied by
-            + 1;    // Repaired by
+        const metas: (BreakdownSingle | null)[] = [];
+        metas.push(await IndividualReporter.singleSupportedBy(parameters, "Healed by", [PsEvent.heal, PsEvent.squadHeal]));
+        metas.push(await IndividualReporter.singleSupportedBy(parameters, "Healed by", [PsEvent.heal, PsEvent.squadHeal]));
+        metas.push(await IndividualReporter.singleSupportedBy(parameters, "Revived by", [PsEvent.revive, PsEvent.squadRevive]));
+        metas.push(await IndividualReporter.singleSupportedBy(parameters, "Shield repaired by", [PsEvent.shieldRepair, PsEvent.squadShieldRepair]));
+        metas.push(await IndividualReporter.singleSupportedBy(parameters, "Resupplied by", [PsEvent.resupply, PsEvent.squadResupply]));
+        metas.push(await IndividualReporter.singleSupportedBy(parameters, "Repaired by", [PsEvent.maxRepair, PsEvent.squadMaxRepair]));
 
-        const add = (data: BreakdownSingle) => {
-            coll.metas.push(data);
-        }
-
-        const callback = () => {
-            if (--opsLeft == 0) {
-                response.resolveOk(coll);
+        for (const meta of metas) {
+            if (meta != null) {
+                coll.metas.push(meta);
             }
         }
 
-        IndividualReporter.singleSupportedBy(parameters, "Healed by", [PsEvent.heal, PsEvent.squadHeal]).ok(add).always(callback);
-        IndividualReporter.singleSupportedBy(parameters, "Revived by", [PsEvent.revive, PsEvent.squadRevive]).ok(add).always(callback);
-        IndividualReporter.singleSupportedBy(parameters, "Shield repaired by", [PsEvent.shieldRepair, PsEvent.squadShieldRepair]).ok(add).always(callback);
-        IndividualReporter.singleSupportedBy(parameters, "Resupplied by", [PsEvent.resupply, PsEvent.squadResupply]).ok(add).always(callback);
-        IndividualReporter.singleSupportedBy(parameters, "Repaired by", [PsEvent.maxRepair, PsEvent.squadMaxRepair]).ok(add).always(callback);
-
-        return response;
+        return coll;
     }
 
-    private static singleSupportedBy(parameters: ReportParameters, name: string, ids: string[]): ApiResponse<BreakdownSingle> {
-        const response: ApiResponse<BreakdownSingle> = new ApiResponse();
-
+    private static async singleSupportedBy(parameters: ReportParameters, name: string, ids: string[]): Promise<BreakdownSingle | null> {
         let found: boolean = false;
         for (const ev of parameters.events) {
             if (ev.type == "exp" && ids.indexOf(ev.expID) > -1 && ev.targetID == parameters.player.characterID) {
@@ -690,21 +536,16 @@ export class IndividualReporter {
         }
 
         if (found == false) {
-            response.resolve({ code: 204, data: null });
-        } else {
-            const meta: BreakdownSingle = new BreakdownSingle();
-            meta.title = name;
-            meta.altTitle = "Player";
-            meta.data = new BreakdownArray();
-
-            EventReporter.experienceSource(ids, parameters.player.characterID, parameters.events).ok((data: BreakdownArray) => {
-                meta.data = data;
-                log.trace(`Found [${data.data.map(iter => `${iter.display}:${iter.amount}`).join(", ")}] for [${ids.join(", ")}]`);
-                response.resolveOk(meta);
-            });
+            return null;
         }
 
-        return response;
+        const meta: BreakdownSingle = new BreakdownSingle();
+        meta.title = name;
+        meta.altTitle = "Player";
+        meta.data = new BreakdownArray();
+        meta.data = await EventReporter.experienceSource(ids, parameters.player.characterID, parameters.events);
+
+        return meta;
     }
 
     private static deployableDestroyedBreakdown(parameters: ReportParameters): BreakdownSingle | null {

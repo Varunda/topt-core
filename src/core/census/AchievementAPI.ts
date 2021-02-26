@@ -1,5 +1,5 @@
 import CensusAPI from "./CensusAPI";
-import { ApiResponse } from "./ApiWrapper";
+import { ApiResponse, ResponseContent } from "./ApiWrapper";
 
 import { Logger } from "../Loggers";
 const log = Logger.getLogger("AchievementAPI");
@@ -24,7 +24,7 @@ export class AchievementAPI {
         description: "Unknown achievement"
     };
 
-    public static parseCharacter(elem: any): Achievement {
+    public static parse(elem: any): Achievement {
         return {
             ID: elem.achievement_id,
             name: elem.name.en,
@@ -33,80 +33,70 @@ export class AchievementAPI {
         };
     }
 
-    public static getByID(achivID: string): ApiResponse<Achievement | null> {
-        const response: ApiResponse<Achievement | null> = new ApiResponse();
+    public static getByID(achivID: string): Promise<Achievement | null> {
+        const url: string = `achievement?item_id=${achivID}`;
 
-        if (AchievementAPI._cache.has(achivID)) {
-            response.resolveOk(AchievementAPI._cache.get(achivID)!);
-        } else {
-            const request: ApiResponse<any> = CensusAPI.get(
-                `achievement?item_id=${achivID}`
-            );
+        return new Promise<Achievement | null>(async (resolve, reject) => {
+            if (AchievementAPI._cache.has(achivID)) {
+                return resolve(AchievementAPI._cache.get(achivID)!);
+            }
 
-            request.ok((data: any) => {
-                if (data.returned != 1) {
-                    response.resolve({ code: 404, data: `No or multiple weapons returned from ${name}` });
-                } else {
-                    const wep: Achievement = AchievementAPI.parseCharacter(data.item_list[0]);
-                    if (!AchievementAPI._cache.has(wep.ID)) {
-                        AchievementAPI._cache.set(wep.ID, wep);
-                        log.trace(`Cached ${wep.ID}: ${JSON.stringify(wep)}`);
+            try {
+                const request: ResponseContent<any> = await CensusAPI.get(url).promise();
+
+                if (request.code == 200) {
+                    if (request.data.returned != 1) {
+                        return resolve(null);
                     }
-                    response.resolveOk(wep);
-                }
-            });
-        }
 
-        return response;
+                    const ach: Achievement = AchievementAPI.parse(request.data.achievement_list[0]);
+                    AchievementAPI._cache.set(achivID, ach);
+
+                    return resolve(ach);
+                } else {
+                    return reject(`API call failed:\n\t${url}\n\t${request.code} ${request.data}`);
+                }
+            } catch (err: any) {
+                return reject(err);
+            }
+        });
     }
 
-    public static getByIDs(weaponIDs: string[]): ApiResponse<Achievement[]> {
-        const response: ApiResponse<Achievement[]> = new ApiResponse();
-
-        if (weaponIDs.length == 0) {
-            response.resolveOk([]);
-            return response;
-        }
-
-        const weapons: Achievement[] = [];
-        const requestIDs: string[] = [];
-
-        for (const weaponID of weaponIDs) {
-            if (AchievementAPI._cache.has(weaponID)) {
-                const wep: Achievement = AchievementAPI._cache.get(weaponID)!;
-                weapons.push(wep);
-            } else {
-                requestIDs.push(weaponID);
+    public static getByIDs(weaponIDs: string[]): Promise<Achievement[]> {
+        return new Promise<Achievement[]>(async (resolve, reject) => {
+            if (weaponIDs.length == 0) {
+                return resolve([]);
             }
-        }
 
-        if (requestIDs.length > 0) {
-            const request: ApiResponse<any> = CensusAPI.get(
-                `achievement?achievement_id=${requestIDs.join(",")}`
-            );
+            const weapons: Achievement[] = [];
+            const requestIDs: string[] = [];
 
-            request.ok((data: any) => {
-                if (data.returned == 0) {
-                    if (weapons.length == 0) {
-                        response.resolve({ code: 404, data: `No or multiple weapons returned from ${name}` });
-                    } else {
-                        response.resolveOk(weapons);
+            for (const weaponID of weaponIDs) {
+                if (AchievementAPI._cache.has(weaponID)) {
+                    const wep: Achievement = AchievementAPI._cache.get(weaponID)!;
+                    weapons.push(wep);
+                } else {
+                    requestIDs.push(weaponID);
+                }
+            }
+
+            if (requestIDs.length > 0) {
+                const url: string = `achievement?achievement_id=${requestIDs.join(",")}`;
+                const request: ResponseContent<any> = await CensusAPI.get(url).promise();
+
+                if (request.code == 200) {
+                    for (const datum of request.data.achievement_list) {
+                        const ach: Achievement = AchievementAPI.parse(datum);
+                        AchievementAPI._cache.set(ach.ID, ach);
+                        weapons.push(ach);
                     }
                 } else {
-                    for (const datum of data.achievement_list) {
-                        const wep: Achievement = AchievementAPI.parseCharacter(datum);
-                        weapons.push(wep);
-                        AchievementAPI._cache.set(wep.ID, wep);
-                        log.trace(`Cached ${wep.ID}`);
-                    }
-                    response.resolveOk(weapons);
+                    log.error(`API call failed:\n\t${url}\n\t${request.code} ${request.data}`);
                 }
-            });
-        } else {
-            response.resolveOk(weapons);
-        }
+            }
 
-        return response;
+            return resolve(weapons);
+        });
     }
 
 }
