@@ -118,11 +118,11 @@ export class CharacterAPI {
             if (requestIDs.length > 0) {
                 const sliceSize: number = 50;
                 let slicesLeft: number = Math.ceil(requestIDs.length / sliceSize);
-                //log.log(`Have ${slicesLeft} slices to do. size of ${sliceSize}, data of ${requestIDs.length}`);
+                log.info(`Have ${slicesLeft} slices to do. size of ${sliceSize}, data of ${requestIDs.length}`);
 
                 for (let i = 0; i < requestIDs.length; i += sliceSize) {
                     const slice: string[] = requestIDs.slice(i, i + sliceSize);
-                    //log.log(`Slice ${i}: ${i} - ${i + sliceSize - 1}: [${slice.join(",")}]`);
+                    log.info(`Slice ${i}: ${i} - ${i + sliceSize - 1}: [${slice.join(",")}]`);
 
                     try {
                         const url: string = `/character/?character_id=${slice.join(",")}&c:resolve=outfit,online_status`;
@@ -140,6 +140,10 @@ export class CharacterAPI {
                         log.error(err);
                     }
                 }
+
+                log.info(`Did all slices`);
+
+                return resolve(chars);
             } else {
                 return resolve(chars);
             }
