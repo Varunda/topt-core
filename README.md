@@ -1,4 +1,4 @@
-TOPT-core
+T1DE Op Tracker Core
 ####
 
-Core functionality of TOPT necessary to run the tracker
+Core functionality of TOPT necessary to run the tracker. See Wiki for more info
