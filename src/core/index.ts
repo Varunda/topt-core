@@ -17,13 +17,12 @@ export * from "./census/VehicleAPI";
 export * from "./census/WeaponAPI";
 
 export * from "./objects/index";
-
-export * from "./Playback";
-
 export * from "./events/index";
 
 export * from "./reports/OutfitReport";
 export * from "./reports/FightReport";
+export * from "./reports/DesoReport";
+export * from "./winter/index";
 
 export * from "./squad/Squad";
 export * from "./squad/SquadMember";
@@ -34,7 +33,7 @@ export * from "./EventReporter";
 export * from "./InvididualGenerator";
 export * from "./PsEvent";
 export * from "./StatMap";
-
-export * from "./winter/index";
-
 export * from "./Loggers";
+export * from "./Playback";
+
+export * from "./PromiseProgress";

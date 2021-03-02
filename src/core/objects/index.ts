@@ -5,5 +5,6 @@ import { BaseOverview } from "./BaseOverview";
 import { BaseFightEntry } from "./BaseFightEntry";
 import { BaseFightEncounter } from "./BaseFightEncounter";
 import { BaseStatus } from "./BaseStatus";
+import { TrackedNpc, TrackedNpcType } from "./TrackedNpc";
 
-export { BaseExchange, TrackedPlayer, SquadStat, BaseOverview, BaseFightEntry, BaseFightEncounter, BaseStatus }
+export { BaseExchange, TrackedPlayer, SquadStat, BaseOverview, BaseFightEntry, BaseFightEncounter, BaseStatus, TrackedNpc, TrackedNpcType }

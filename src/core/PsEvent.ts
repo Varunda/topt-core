@@ -79,7 +79,11 @@ export class PsEvent {
     public static savior: string = "335";
     public static ribbon: string = "291";
     public static routerKill: string = "1409";
+    public static constructionSpawn: string = "1410";
+    public static sundySpawn: string = "233";
     public static beaconKill: string = "270";
+
+    public static sundyDestroyed: string = "68";
 
     public static controlPointAttack: string = "16";
     public static controlPointDefend: string = "15";
@@ -263,7 +267,7 @@ export const PsEvents: Map<string, PsEvent> = new Map<string, PsEvent>([
         track: true,
         alsoIncrement: PsEvent.squadSpawn
     }],
-    ["233", {
+    [PsEvent.sundySpawn, { // 233
         name: "Sundy spawn",
         types: ["logistics"],
         track: true,

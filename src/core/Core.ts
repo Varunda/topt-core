@@ -1,12 +1,10 @@
-import { ApiResponse, ResponseContent } from "./census/ApiWrapper";
-
 import CensusAPI from "./census/CensusAPI";
 import { OutfitAPI, Outfit } from "./census/OutfitAPI";
 import { CharacterAPI, Character } from "./census/CharacterAPI";
 
-import { TrackedPlayer, BaseExchange } from "./objects/index";
+import { TrackedPlayer, BaseExchange, TrackedNpc } from "./objects/index";
 
-import { FacilityCapture, TimeTracking, TrackedRouter } from "./InvididualGenerator";
+import { FacilityCapture, TimeTracking } from "./InvididualGenerator";
 
 import {
     TEvent, TEventType, 
@@ -45,15 +43,20 @@ export class Core {
     };
 
     /**
-     * Collection of variables used to track router placements
+     * NPCs that are tracked
      */
-    public routerTracking = {
-        // key - Who placed the router
-        // value - Lastest npc ID that gave them a router spawn tick
-        routerNpcs: new Map() as Map<string, TrackedRouter>, // <char ID, npc ID>
+    public npcs = {
 
-        routers: [] as TrackedRouter[] // All routers that have been placed
-    };
+        /**
+         * NPCs that are actively providing spawns. <npc_id, npc>
+         */
+        active: new Map() as Map<string, TrackedNpc>,
+
+        /**
+         * All NPCs that were tracked and found
+         */
+        all: [] as TrackedNpc[]
+    }
 
     /**
      * Collection of squad related vars
@@ -150,6 +153,8 @@ export class Core {
         CensusAPI.init(this.serviceID);
 
         this.squadInit();
+
+        log.info(`Using Promise core`);
     }
 
     /**
@@ -273,6 +278,17 @@ export class Core {
                 char.secondsOnline = 0;
             }
         });
+
+        this.npcs.active.forEach((npc: TrackedNpc, npcID: string) => {
+            const withEnd: TrackedNpc = { ...npc };
+            if (withEnd.spawns.length == 0) {
+                withEnd.destroyedAt = withEnd.pulledAt;
+            } else {
+                withEnd.destroyedAt = withEnd.spawns[withEnd.spawns.length - 1];
+            }
+
+            this.npcs.all.push(withEnd);
+        });
     }
 
     /**
@@ -282,28 +298,22 @@ export class Core {
      * 
      * @returns An ApiResponse that will resolve when the outfit has been loaded
      */
-    public addOutfit(tag: string): ApiResponse {
+    public async addOutfit(tag: string): Promise<void> {
         if (this.connected == false) {
             throw `Cannot track outfit ${tag}: Core is not connected`;
         }
 
-        const response: ApiResponse = new ApiResponse();
+        try {
+            const outfit: Outfit | null = await OutfitAPI.getByTag(tag);
+            if (outfit != null) {
+                this.outfits.push(outfit);
+            }
 
-        if (tag.trim().length == 0) {
-            response.resolveOk();
-            return response;
+            const chars: Character[] = await OutfitAPI.getCharactersByTag(tag);
+            this.subscribeToEvents(chars);
+        } catch (err: any) {
+            log.error(err);
         }
-
-        OutfitAPI.getByTag(tag).ok((data: Outfit) => {
-            this.outfits.push(data);
-        });
-
-        OutfitAPI.getCharactersByTag(tag).ok((data: Character[]) => {
-            this.subscribeToEvents(data);
-            response.resolveOk();
-        });
-
-        return response;
     }
 
     /**
@@ -313,23 +323,17 @@ export class Core {
      * 
      * @returns An ApiResponse that will resolve when the character has been loaded and tracked
      */
-    public addPlayer(name: string): ApiResponse {
+    public async addPlayer(name: string): Promise<void> {
         if (this.connected == false) {
             throw `Cannot track character ${name}: Core is not connected`;
         }
 
-        const response: ApiResponse = new ApiResponse();
-
-        if (name.trim().length == 0) {
-            response.resolveOk();
-        } else {
-            CharacterAPI.getByName(name).ok((data: Character) => {
-                this.subscribeToEvents([data]);
-                response.resolveOk();
-            });
+        if (name.trim().length > 0) {
+            const char: Character | null = await CharacterAPI.getByName(name);
+            if (char != null) {
+                this.subscribeToEvents([char]);
+            }
         }
-
-        return response;
     }
 
     /**
@@ -339,25 +343,19 @@ export class Core {
      * 
      * @returns An ApiResponse that will resolve when the character has been loaded and tracked
      */
-    public addPlayerByID(charID: string): ApiResponse {
+    public async addPlayerByID(charID: string): Promise<void> {
         if (this.connected == false) {
-            throw `Cannot tracker character ${charID}: Core is not connected`;
+            throw `Cannot track character ${charID}: Core is not connected`;
         }
 
-        const response: ApiResponse = new ApiResponse();
-
-        if (charID.trim().length == 0) {
-            response.resolveOk();
-        } else {
-            CharacterAPI.getByID(charID).ok((data: Character) => {
-                this.subscribeToEvents([data]);
-                response.resolveOk();
-            }).notFound((err: string) => {
-                response.resolve({ code: 500, data: `Character ID ${charID} does not exist` });
-            });
+        if (charID.trim().length > 0) {
+            const char: Character | null = await CharacterAPI.getByID(charID);
+            if (char != null) {
+                this.subscribeToEvents([char]);
+            } else {
+                log.warn(`Failed to get ${charID} from CharacterAPI`);
+            }
         }
-
-        return response;
     }
 
     /**
@@ -430,24 +428,6 @@ export class Core {
         }
     }
 
-    public promiseTest(): void {
-        const t: ApiResponse<string> = new ApiResponse();
-        const p: Promise<ResponseContent<string>> = t.promise();
-
-        setTimeout(async () => {
-            const contents: ResponseContent<string> = await p;
-            if (contents.code == 200) {
-                console.log(`200: ${contents.data}`);
-            } else if (contents.code == 500) {
-                console.error(`500: ${contents.data}`);
-            }
-        });
-
-        setTimeout(() => {
-            t.resolve({ code: 200, data: `Hello from the other side` });
-        }, 3000);
-    }
-
     /**
      * Subscribe to the events in the event stream and begin tracking them in the squad tracker
      * 
@@ -508,6 +488,30 @@ export class Core {
 
             this.sockets.tracked.send(JSON.stringify(subscribeExp));
         }
+    }
+
+    public subcribeByID(charID: string): void {
+        if (this.sockets.tracked == null) {
+            return log.error(`cannot subscribe to ${charID}, sockets.tracked is null`);
+        }
+
+        const subscribeExp: object = {
+            "action": "subscribe",
+            "characters": [
+                charID
+            ],
+            "eventNames": [
+                "GainExperience",
+                "AchievementEarned",
+                "Death",
+                "FacilityControl",
+                "ItemAdded",
+                "VehicleDestroy"
+            ],
+            "service": "event"
+        };
+
+        this.sockets.tracked.send(JSON.stringify(subscribeExp));
     }
 
     /**

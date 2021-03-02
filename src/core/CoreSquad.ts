@@ -361,13 +361,13 @@ Core.prototype.processExperienceEvent = function(event: TExpEvent): void {
         if (squadEvents.indexOf(event.trueExpID) > -1) {
             if (sourceMember == undefined && targetMember != undefined) {
                 log.info(`${event.sourceID} is not tracked, adding them to the tracker from ${JSON.stringify(event)}`);
-                this.addPlayerByID(event.sourceID).ok(() => {
+                this.addPlayerByID(event.sourceID).then(() => {
                     this.processExperienceEvent(event);
                 });
             }
             if (sourceMember != undefined && targetMember == undefined) {
                 log.info(`${event.targetID} is not tracked, adding them to the tracker from ${JSON.stringify(event)}`);
-                this.addPlayerByID(event.targetID).ok(() => {
+                this.addPlayerByID(event.targetID).then(() => {
                     this.processExperienceEvent(event);
                 });
             }

@@ -1,5 +1,5 @@
 import CensusAPI from "./CensusAPI";
-import { ApiResponse } from "./ApiWrapper";
+import { ApiResponse, ResponseContent } from "./ApiWrapper";
 
 import { Logger } from "../Loggers";
 const log = Logger.getLogger("WeaponAPI");
@@ -37,9 +37,9 @@ export class WeaponAPI {
     private static _pendingTimerID: number = -1;
 
     // <weapon ID, response>
-    private static _pendingRequests: Map<string, ApiResponse<Weapon | null>> = new Map();
+    private static _pendingRequests: Map<string, Promise<Weapon | null>> = new Map();
 
-    public static parseCharacter(elem: any): Weapon {
+    public static parse(elem: any): Weapon {
         return {
             ID: elem.item_id,
             name: elem.name?.en ?? `Unnamed ${elem.item_id}`,
@@ -74,100 +74,87 @@ export class WeaponAPI {
         }, 100) as unknown as number;
     }
 
-    public static getByID(weaponID: string): ApiResponse<Weapon | null> {
+    public static getByID(weaponID: string): Promise<Weapon | null> {
         if (WeaponAPI._pendingRequests.has(weaponID)) {
             return WeaponAPI._pendingRequests.get(weaponID)!;
         }
 
-        const response: ApiResponse<Weapon | null> = new ApiResponse();
+        const prom: Promise<Weapon | null> = new Promise(async (resolve, reject) => {
+            if (WeaponAPI._cache.has(weaponID)) {
+                return resolve(WeaponAPI._cache.get(weaponID)!);
+            } else {
+                const url: string = `item?item_id=${weaponID}&c:hide=description,max_stack_size,image_path&c:lang=en&c:join=item_category^inject_at:category`;
 
-        if (WeaponAPI._cache.has(weaponID)) {
-            response.resolveOk(WeaponAPI._cache.get(weaponID)!);
-        } else {
-            const request: ApiResponse<any> = CensusAPI.get(
-                `item?item_id=${weaponID}&c:hide=description,max_stack_size,image_path&c:lang=en&c:join=item_category^inject_at:category`
-            );
+                try {
+                    WeaponAPI._pendingRequests.set(weaponID, prom);
+                    const request: ResponseContent<any> = await CensusAPI.get(url).promise();
+                    WeaponAPI._pendingRequests.delete(weaponID);
 
-            WeaponAPI._pendingRequests.set(weaponID, response);
+                    if (request.code == 200) {
+                        if (request.data.returned != 1) {
+                            return resolve(null);
+                        }
 
-            request.ok((data: any) => {
-                if (data.returned != 1) {
-                    response.resolve({ code: 404, data: `No or multiple weapons returned from ${name}` });
-                } else {
-                    const wep: Weapon = WeaponAPI.parseCharacter(data.item_list[0]);
-                    if (!WeaponAPI._cache.has(wep.ID)) {
+                        const wep: Weapon = WeaponAPI.parse(request.data.item_list[0]);
                         WeaponAPI._cache.set(wep.ID, wep);
+                        return resolve(wep);
+                    } else {
+                        return reject(`API call failed:\n\t${url}\n\t${request.code} ${request.data}`);
                     }
-                    response.resolveOk(wep);
+                } catch (err: any) {
+                    return reject(err);
                 }
-            }).internalError((err: string) => {
-                WeaponAPI._cache.set(weaponID, null);
-                log.error(err);
-            }).always(() => {
-                WeaponAPI._pendingRequests.delete(weaponID);
-            });
-        }
+            }
+        });
 
-        return response;
+        return prom;
     }
 
-    public static getByIDs(weaponIDs: string[]): ApiResponse<Weapon[]> {
-        const response: ApiResponse<Weapon[]> = new ApiResponse();
+    public static getByIDs(weaponIDs: string[]): Promise<Weapon[]> {
+        return new Promise<Weapon[]>(async (resolve, reject) => {
+            // Remove duplicates
+            weaponIDs = weaponIDs.filter((v, i, a) => a.indexOf(v) == i);
 
-        // Remove duplicates
-        weaponIDs = weaponIDs.filter((v, i, a) => a.indexOf(v) == i);
-
-        const weapons: Weapon[] = [];
-        const requestIDs: string[] = [];
-
-        for (const weaponID of weaponIDs) {
-            if (WeaponAPI._cache.has(weaponID)) {
-                const wep: Weapon | null = WeaponAPI._cache.get(weaponID)!;
-                if (wep != null) {
-                    weapons.push(wep);
-                }
-            } else {
-                requestIDs.push(weaponID);
+            if (weaponIDs.length == 0) {
+                return resolve([]);
             }
-        }
 
-        if (requestIDs.length > 0) {
-            const request: ApiResponse<any> = CensusAPI.get(
-                `item?item_id=${requestIDs.join(",")}&c:hide=description,max_stack_size,image_path&c:lang=en&c:join=item_category^inject_at:category`
-            );
+            const weapons: Weapon[] = [];
+            const requestIDs: string[] = [];
 
-            request.ok((data: any) => {
-                if (data.returned == 0) {
-                    if (weapons.length == 0) {
-                        response.resolve({ code: 404, data: `No or multiple weapons returned from ${name}` });
-                    } else {
-                        response.resolveOk(weapons);
-                    }
-                } else {
-                    for (const datum of data.item_list) {
-                        const wep: Weapon = WeaponAPI.parseCharacter(datum);
+            for (const weaponID of weaponIDs) {
+                if (WeaponAPI._cache.has(weaponID)) {
+                    const wep: Weapon | null = WeaponAPI._cache.get(weaponID)!;
+                    if (wep != null) {
                         weapons.push(wep);
-                        WeaponAPI._cache.set(wep.ID, wep);
                     }
-                    response.resolveOk(weapons);
-                }
-            }).internalError((err: string) => {
-                for (const wepID of requestIDs) {
-                    WeaponAPI._cache.set(wepID, null);
-                }
-                if (weapons.length > 0) {
-                    log.error(`API call failed, but some weapons were cached, so using that`);
-                    response.resolveOk(weapons);
                 } else {
-                    response.resolve({ code: 500, data: "" });
+                    requestIDs.push(weaponID);
                 }
-                log.error(err);
-            });
-        } else {
-            response.resolveOk(weapons);
-        }
+            }
 
-        return response;
+            if (requestIDs.length > 0) {
+                const url: string = `item?item_id=${requestIDs.join(",")}&c:hide=description,max_stack_size,image_path&c:lang=en&c:join=item_category^inject_at:category`;
+
+                try {
+                    const request: ResponseContent<any> = await CensusAPI.get(url).promise();
+
+                    if (request.code == 200) {
+                        for (const datum of request.data.item_list) {
+                            const wep: Weapon = WeaponAPI.parse(datum);
+                            WeaponAPI._cache.set(wep.ID, wep);
+                            weapons.push(wep);
+                        }
+                    } else {
+                        log.error(`API call failed:\n\t${url}\n\t${request.code} ${request.data}`);
+                    }
+                } catch (err: any) {
+                    log.error(err);
+                }
+            }
+
+            return resolve(weapons);
+        });
     }
 
 }

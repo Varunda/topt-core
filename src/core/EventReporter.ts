@@ -120,43 +120,40 @@ export class Streak {
 
 }
 
-export function statMapToBreakdown<T>(map: StatMap,
-        source: (IDs: string[]) => ApiResponse<T[]>,
+export async function statMapToBreakdown<T>(map: StatMap,
+        source: (IDs: string[]) => Promise<T[]>,
         matcher: (elem: T, ID: string) => boolean,
         mapper: (elem: T | undefined, ID: string) => string,
         sortField: ((elem: T | undefined, ID: string) => string) | undefined = undefined
-    ): ApiResponse<BreakdownArray> {
+    ): Promise<BreakdownArray> {
 
     const breakdown: ApiResponse<BreakdownArray> = new ApiResponse();
     const arr: BreakdownArray = new BreakdownArray();
 
     if (map.size() > 0) {
         const IDs: string[] = Array.from(map.getMap().keys());
-        source(IDs).ok((data: T[]) => {
-            map.getMap().forEach((amount: number, ID: string) => {
-                const datum: T | undefined = data.find(elem => matcher(elem, ID));
-                const breakdown: Breakdown = {
-                    display: mapper(datum, ID),
-                    sortField: (sortField != undefined) ? sortField(datum, ID) : mapper(datum, ID),
-                    amount: amount,
-                    color: undefined
-                }
-                arr.total += amount;
-                arr.data.push(breakdown);
-            });
-
-            arr.data.sort((a, b) => {
-                const diff: number = b.amount - a.amount;
-                return diff || b.sortField.localeCompare(a.sortField);
-            });
-
-            breakdown.resolveOk(arr);
+        const data: T[] = await source(IDs);
+        map.getMap().forEach((amount: number, ID: string) => {
+            const datum: T | undefined = data.find(elem => matcher(elem, ID));
+            const breakdown: Breakdown = {
+                display: mapper(datum, ID),
+                sortField: (sortField != undefined) ? sortField(datum, ID) : mapper(datum, ID),
+                amount: amount,
+                color: undefined
+            }
+            arr.total += amount;
+            arr.data.push(breakdown);
         });
-    } else {
-        breakdown.resolveOk(arr);
+
+        arr.data.sort((a, b) => {
+            const diff: number = b.amount - a.amount;
+            return diff || b.sortField.localeCompare(a.sortField);
+        });
+
+        return arr;
     }
 
-    return breakdown;
+    return arr;
 }
 
 export function defaultCharacterMapper(elem: Character | undefined, ID: string): string {
@@ -253,9 +250,7 @@ export default class EventReporter {
         return streaks;
     }
 
-    public static facilityCaptures(data: {captures: FacilityCapture[], players: (TCaptureEvent | TDefendEvent)[]}): ApiResponse<BaseCapture[]> {
-        const response: ApiResponse<BaseCapture[]> = new ApiResponse();
-
+    public static async facilityCaptures(data: {captures: FacilityCapture[], players: (TCaptureEvent | TDefendEvent)[]}): Promise<BaseCapture[]> {
         const baseCaptures: BaseCapture[] = [];
 
         const captures: FacilityCapture[] = data.captures;
@@ -268,76 +263,73 @@ export default class EventReporter {
 
         log.debug(`Getting these outfits: [${outfitIDs.join(", ")}]`);
 
-        OutfitAPI.getByIDs(outfitIDs).ok((data: Outfit[]) => {
-            log.debug(`Loaded ${data.length}/${outfitIDs.length}. Processing ${captures.length} captures`);
-            for (const capture of captures) {
-                // Same faction caps are boring
-                log.debug(`processing ${JSON.stringify(capture)}`);
-                if (capture.factionID == capture.previousFaction) {
-                    log.debug(`Skipping capture: ${JSON.stringify(capture)}`);
-                    continue;
-                }
-
-                const entry: BaseCapture = new BaseCapture();
-                entry.timestamp = capture.timestamp.getTime();
-                entry.name = capture.name;
-                entry.faction = capture.previousFaction;
-
-                const outfitID: string = capture.outfitID;
-                const outfit: Outfit | undefined = data.find(iter => iter.ID == outfitID);
-                if (outfit == undefined) {
-                    log.warn(`Missing outfit ${outfitID}`);
-                    continue;
-                }
-
-                const helpers: (TDefendEvent | TCaptureEvent)[] = players.filter(iter => iter.timestamp == capture.timestamp.getTime());
-                const outfits: BaseCaptureOutfit[] = [{ name: "No outfit", ID: "-1", amount: 0, tag: "" }];
-                for (const helper of helpers) {
-                    let outfitEntry: BaseCaptureOutfit | undefined = undefined;
-                    if (helper.outfitID == "0" || helper.outfitID.length == 0) {
-                        outfitEntry = outfits[0];
-                    } else {
-                        outfitEntry = outfits.find(iter => iter.ID == helper.outfitID);
-                        if (outfitEntry == undefined) {
-                            const outfitDatum: Outfit | undefined = data.find(iter => iter.ID == helper.outfitID);
-                            outfitEntry = {
-                                ID: helper.outfitID,
-                                name: outfitDatum?.name ?? `Unknown ${helper.outfitID}`,
-                                amount: 0,
-                                tag: outfitDatum?.tag ?? ``,
-                            }
-                            outfits.push(outfitEntry);
-                        }
-                    }
-
-                    ++outfitEntry.amount;
-                }
-
-                const breakdown: BreakdownArray = {
-                    data: outfits.sort((a, b) => b.amount - a.amount).map(iter => {
-                        return {
-                            display: iter.name,
-                            amount: iter.amount,
-                            color: undefined,
-                            sortField: `${iter.amount}`
-                        }
-                    }),
-                    total: outfits.reduce(((acc, iter) => acc += iter.amount), 0),
-                    display: null
-                };
-
-                entry.outfits = breakdown;
-
-                baseCaptures.push(entry);
+        const outfits: Outfit[] = await OutfitAPI.getByIDs(outfitIDs);
+        log.debug(`Loaded ${outfits.length}/${outfitIDs.length}. Processing ${captures.length} captures`);
+        for (const capture of captures) {
+            // Same faction caps are boring
+            log.debug(`processing ${JSON.stringify(capture)}`);
+            if (capture.factionID == capture.previousFaction) {
+                log.debug(`Skipping capture: ${JSON.stringify(capture)}`);
+                continue;
             }
 
-            response.resolveOk(baseCaptures);
-        });
+            const entry: BaseCapture = new BaseCapture();
+            entry.timestamp = capture.timestamp.getTime();
+            entry.name = capture.name;
+            entry.faction = capture.previousFaction;
 
-        return response;
+            const outfitID: string = capture.outfitID;
+            const outfit: Outfit | undefined = outfits.find(iter => iter.ID == outfitID);
+            if (outfit == undefined) {
+                log.warn(`Missing outfit ${outfitID}`);
+                continue;
+            }
+
+            const helpers: (TDefendEvent | TCaptureEvent)[] = players.filter(iter => iter.timestamp == capture.timestamp.getTime());
+            const outfitEntries: BaseCaptureOutfit[] = [{ name: "No outfit", ID: "-1", amount: 0, tag: "" }];
+            for (const helper of helpers) {
+                let outfitEntry: BaseCaptureOutfit | undefined = undefined;
+                if (helper.outfitID == "0" || helper.outfitID.length == 0) {
+                    outfitEntry = outfitEntries[0];
+                } else {
+                    outfitEntry = outfitEntries.find(iter => iter.ID == helper.outfitID);
+                    if (outfitEntry == undefined) {
+                        const outfitDatum: Outfit | undefined = outfits.find(iter => iter.ID == helper.outfitID);
+                        outfitEntry = {
+                            ID: helper.outfitID,
+                            name: outfitDatum?.name ?? `Unknown ${helper.outfitID}`,
+                            amount: 0,
+                            tag: outfitDatum?.tag ?? ``,
+                        }
+                        outfitEntries.push(outfitEntry);
+                    }
+                }
+
+                ++outfitEntry.amount;
+            }
+
+            const breakdown: BreakdownArray = {
+                data: outfitEntries.sort((a, b) => b.amount - a.amount).map(iter => {
+                    return {
+                        display: iter.name,
+                        amount: iter.amount,
+                        color: undefined,
+                        sortField: `${iter.amount}`
+                    }
+                }),
+                total: outfitEntries.reduce(((acc, iter) => acc += iter.amount), 0),
+                display: null
+            };
+
+            entry.outfits = breakdown;
+
+            baseCaptures.push(entry);
+        }
+
+        return baseCaptures;
     }
 
-    public static experience(expID: string, events: TEvent[]): ApiResponse<BreakdownArray> {
+    public static experience(expID: string, events: TEvent[]): Promise<BreakdownArray> {
         const exp: StatMap = new StatMap();
 
         for (const event of events) {
@@ -354,7 +346,7 @@ export default class EventReporter {
         );
     }
 
-    public static experienceSource(ids: string[], targetID: string, events: TEvent[]): ApiResponse<BreakdownArray> {
+    public static async experienceSource(ids: string[], targetID: string, events: TEvent[]): Promise<BreakdownArray> {
         const exp: StatMap = new StatMap();
 
         for (const event of events) {
@@ -364,7 +356,7 @@ export default class EventReporter {
         }
 
         if (exp.size() == 0) {
-            return ApiResponse.resolve({ code: 204, data: null });
+            return new BreakdownArray();
         }
 
         log.debug(`charIDs: [${Array.from(exp.getMap().keys()).join(", ")}]`);
@@ -377,14 +369,12 @@ export default class EventReporter {
         );
     }
 
-    public static outfitVersusBreakdown(events: TEvent[]): ApiResponse<OutfitVersusBreakdown[]> {
-        const response: ApiResponse<OutfitVersusBreakdown[]> = new ApiResponse();
-
+    public static async outfitVersusBreakdown(events: TEvent[]): Promise<OutfitVersusBreakdown[]> {
         const outfitBreakdowns: Map<string, OutfitVersusBreakdown> = new Map();
         const outfitPlayers: Map<string, string[]> = new Map();
 
-       const killCount: number = events.filter(iter => iter.type == "kill").length;
-       const deathCount: number = events.filter(iter => iter.type == "death" && iter.revived == false).length;
+        const killCount: number = events.filter(iter => iter.type == "kill").length;
+        const deathCount: number = events.filter(iter => iter.type == "death" && iter.revived == false).length;
 
         const charIDs: string[] = events.filter((iter: TEvent) => iter.type == "kill" || (iter.type == "death" && iter.revived == false)) 
             .map((iter: TEvent) => {
@@ -396,80 +386,82 @@ export default class EventReporter {
                 throw `Invalid event type '${iter.type}'`;
             });
 
-        CharacterAPI.getByIDs(charIDs).ok((data: Character[]) => {
-            for (const ev of events) {
-                if (ev.type == "kill" || ev.type == "death") {
-                    const killedChar = data.find(iter => iter.ID == ev.targetID);
-                    if (killedChar == undefined) {
-                        log.warn(`Missing ${ev.type} targetID ${ev.targetID}`);
-                    } else {
-                        const outfitID: string = killedChar.outfitID;
+        log.debug(`Loading ${charIDs.length} characters`);
 
-                        if (outfitBreakdowns.has(outfitID) == false) {
-                            const breakdown: OutfitVersusBreakdown = new OutfitVersusBreakdown();
-                            breakdown.tag = killedChar.outfitTag;
-                            breakdown.name = killedChar.outfitName || "<No outfit>";
-                            breakdown.faction = killedChar.faction;
-                            outfitBreakdowns.set(outfitID, breakdown);
-                            outfitPlayers.set(outfitID, []);
+        const data: Character[] = await CharacterAPI.getByIDs(charIDs);
+
+        log.debug(`Loaded ${data.length}/${charIDs.length} characters`);
+
+        for (const ev of events) {
+            if (ev.type == "kill" || ev.type == "death") {
+                const killedChar = data.find(iter => iter.ID == ev.targetID);
+                if (killedChar == undefined) {
+                    log.warn(`Missing ${ev.type} targetID ${ev.targetID}`);
+                } else {
+                    const outfitID: string = killedChar.outfitID;
+
+                    if (outfitBreakdowns.has(outfitID) == false) {
+                        const breakdown: OutfitVersusBreakdown = new OutfitVersusBreakdown();
+                        breakdown.tag = killedChar.outfitTag;
+                        breakdown.name = killedChar.outfitName || "<No outfit>";
+                        breakdown.faction = killedChar.faction;
+                        outfitBreakdowns.set(outfitID, breakdown);
+                        outfitPlayers.set(outfitID, []);
+                    }
+
+                    const breakdown: OutfitVersusBreakdown = outfitBreakdowns.get(outfitID)!;
+                    if (ev.type == "kill") {
+                        ++breakdown.kills;
+                    } else if (ev.type == "death") {
+                        if (ev.revived == true) {
+                            ++breakdown.revived;
+                        } else {
+                            ++breakdown.deaths;
                         }
+                    }
 
-                        const breakdown: OutfitVersusBreakdown = outfitBreakdowns.get(outfitID)!;
-                        if (ev.type == "kill") {
-                            ++breakdown.kills;
-                        } else if (ev.type == "death") {
-                            if (ev.revived == true) {
-                                ++breakdown.revived;
-                            } else {
-                                ++breakdown.deaths;
-                            }
+                    const loadout: PsLoadout | undefined = PsLoadouts.get(ev.loadoutID);
+                    const coll: ClassCollection<number> = ev.type == "kill" ? breakdown.classKills
+                        : ev.type == "death" && ev.revived == false ? breakdown.classDeaths
+                        : breakdown.classRevived;
+
+                    if (loadout != undefined) {
+                        if (loadout.type == "infil") {
+                            ++coll.infil;
+                        } else if (loadout.type == "lightAssault") {
+                            ++coll.lightAssault;
+                        } else if (loadout.type == "medic") {
+                            ++coll.medic;
+                        } else if (loadout.type == "engineer") {
+                            ++coll.engineer;
+                        } else if (loadout.type == "heavy") {
+                            ++coll.heavy;
+                        } else if (loadout.type == "max") {
+                            ++coll.max;
                         }
+                    }
 
-                        const loadout: PsLoadout | undefined = PsLoadouts.get(ev.loadoutID);
-                        const coll: ClassCollection<number> = ev.type == "kill" ? breakdown.classKills
-                            : ev.type == "death" && ev.revived == false ? breakdown.classDeaths
-                            : breakdown.classRevived;
-
-                        if (loadout != undefined) {
-                            if (loadout.type == "infil") {
-                                ++coll.infil;
-                            } else if (loadout.type == "lightAssault") {
-                                ++coll.lightAssault;
-                            } else if (loadout.type == "medic") {
-                                ++coll.medic;
-                            } else if (loadout.type == "engineer") {
-                                ++coll.engineer;
-                            } else if (loadout.type == "heavy") {
-                                ++coll.heavy;
-                            } else if (loadout.type == "max") {
-                                ++coll.max;
-                            }
-                        }
-
-                        const players: string[] = outfitPlayers.get(outfitID)!;
-                        if (players.indexOf(ev.targetID) == -1) {
-                            ++breakdown.players;
-                            players.push(ev.targetID);
-                        }
+                    const players: string[] = outfitPlayers.get(outfitID)!;
+                    if (players.indexOf(ev.targetID) == -1) {
+                        ++breakdown.players;
+                        players.push(ev.targetID);
                     }
                 }
             }
+        }
 
-            // Only include the outfit if they were > 1% of the kills or deaths
-            const breakdowns: OutfitVersusBreakdown[] = Array.from(outfitBreakdowns.values())
-                .filter(iter => iter.kills > (killCount / 100) || iter.deaths > (deathCount / 100));
+        // Only include the outfit if they were > 1% of the kills or deaths
+        const breakdowns: OutfitVersusBreakdown[] = Array.from(outfitBreakdowns.values())
+            .filter(iter => iter.kills > (killCount / 100) || iter.deaths > (deathCount / 100));
 
-            breakdowns.sort((a, b) => {
-                return b.deaths - a.deaths
-                    || b.kills - a.kills
-                    || b.revived - a.revived
-                    || b.tag.localeCompare(a.tag);
-            });
-
-            response.resolveOk(breakdowns);
+        breakdowns.sort((a, b) => {
+            return b.deaths - a.deaths
+                || b.kills - a.kills
+                || b.revived - a.revived
+                || b.tag.localeCompare(a.tag);
         });
 
-        return response;
+        return breakdowns;
     }
 
     public static kpmBoxplot(players: TrackedPlayer[], tracking: TimeTracking, loadout?: PsLoadoutType): number[] {
@@ -567,9 +559,7 @@ export default class EventReporter {
         return kds;
     }
 
-    public static weaponDeathBreakdown(events: TEvent[]): ApiResponse<BreakdownWeaponType[]> {
-        const response: ApiResponse<BreakdownWeaponType[]> = new ApiResponse();
-
+    public static async weaponDeathBreakdown(events: TEvent[]): Promise<BreakdownWeaponType[]> {
         const weapons: string[] = (events.filter((ev: TEvent) => ev.type == "death") as TDeathEvent[])
             .map((ev: TDeathEvent) => ev.weaponID)
             .filter((ID: string, index: number, arr: string[]) => arr.indexOf(ID) == index);
@@ -581,83 +571,83 @@ export default class EventReporter {
 
         const missingWeapons: Set<string> = new Set();
 
-        WeaponAPI.getByIDs(weapons).ok((data: Weapon[]) => {
-            const deaths: TDeathEvent[] = events.filter(ev => ev.type == "death") as TDeathEvent[];
+        const data: Weapon[] = await WeaponAPI.getByIDs(weapons);
 
-            for (const death of deaths) {
-                const weapon = data.find(iter => iter.ID == death.weaponID);
-                if (weapon == undefined) {
-                    missingWeapons.add(death.weaponID);
-                }
-                const typeName = weapon?.type ?? "Other";
+        const deaths: TDeathEvent[] = events.filter(ev => ev.type == "death") as TDeathEvent[];
 
-                let type = types.find(iter => iter.type == typeName);
-                if (type == undefined) {
-                    type = {
-                        type: typeName,
-                        deaths: 0,
-                        headshots: 0,
-                        revived: 0,
-                        unrevived: 0,
-                        mostUsed: "",
-                        mostUsedDeaths: 0
-                    };
-                    types.push(type);
-                }
+        for (const death of deaths) {
+            const weapon = data.find(iter => iter.ID == death.weaponID);
+            if (weapon == undefined && death.weaponID != "0") {
+                missingWeapons.add(death.weaponID);
+            }
+            const typeName = weapon?.type ?? "Other";
 
-                if (weapon != undefined) {
-                    if (!used.has(weapon.type)) {
-                        used.set(weapon.type, new Map<string, number>());
-                    }
-
-                    const set: Map<string, number> = used.get(weapon.type)!;
-                    set.set(weapon.name, (set.get(weapon.name) ?? 0) + 1);
-
-                    used.set(weapon.type, set);
-                }
-
-                ++type.deaths;
-                if (death.revived == false) {
-                    ++type.unrevived;
-                } else {
-                    ++type.revived;
-                }
-
-                if (death.isHeadshot == true) {
-                    ++type.headshots;
-                }
+            let type = types.find(iter => iter.type == typeName);
+            if (type == undefined) {
+                type = {
+                    type: typeName,
+                    deaths: 0,
+                    headshots: 0,
+                    revived: 0,
+                    unrevived: 0,
+                    mostUsed: "",
+                    mostUsedDeaths: 0
+                };
+                types.push(type);
             }
 
-            used.forEach((weapons: Map<string, number>, type: string) => {
-                const breakdown: BreakdownWeaponType = types.find(iter => iter.type == type)!;
+            if (weapon != undefined) {
+                if (!used.has(weapon.type)) {
+                    used.set(weapon.type, new Map<string, number>());
+                }
 
-                weapons.forEach((deaths: number, weapon: string) => {
-                    if (deaths > breakdown.mostUsedDeaths) {
-                        breakdown.mostUsedDeaths = deaths;
-                        breakdown.mostUsed = weapon;
-                    }
-                });
+                const set: Map<string, number> = used.get(weapon.type)!;
+                set.set(weapon.name, (set.get(weapon.name) ?? 0) + 1);
+
+                used.set(weapon.type, set);
+            }
+
+            ++type.deaths;
+            if (death.revived == false) {
+                ++type.unrevived;
+            } else {
+                ++type.revived;
+            }
+
+            if (death.isHeadshot == true) {
+                ++type.headshots;
+            }
+        }
+
+        used.forEach((weapons: Map<string, number>, type: string) => {
+            const breakdown: BreakdownWeaponType = types.find(iter => iter.type == type)!;
+
+            weapons.forEach((deaths: number, weapon: string) => {
+                if (deaths > breakdown.mostUsedDeaths) {
+                    breakdown.mostUsedDeaths = deaths;
+                    breakdown.mostUsed = weapon;
+                }
             });
-
-            types = types.filter((iter: BreakdownWeaponType) => {
-                return iter.deaths / deaths.length > 0.0025;
-            });
-
-            types.sort((a, b) => {
-                return b.deaths - a.deaths
-                    || b.headshots - a.headshots
-                    || b.type.localeCompare(a.type);
-            });
-
-            log.info(`Missing weapons:`, missingWeapons);
-
-            response.resolveOk(types);
         });
 
-        return response;
+        types = types.filter((iter: BreakdownWeaponType) => {
+            return iter.deaths / deaths.length > 0.0025; // Only include outfits with at least 2.5% of deaths
+        });
+
+        types.sort((a, b) => {
+            return b.deaths - a.deaths
+                || b.headshots - a.headshots
+                || b.type.localeCompare(a.type);
+        });
+
+        if (missingWeapons.size > 0) {
+            log.info(`Missing weapons:`, missingWeapons);
+        }
+
+        return types;
     }
 
-    public static vehicleKills(events: TEvent[]): ApiResponse<BreakdownArray> {
+    public static vehicleKills(events: TEvent[]): Promise<BreakdownArray> {
         const vehKills: StatMap = new StatMap();
 
         for (const event of events) {
@@ -673,7 +663,7 @@ export default class EventReporter {
         );
     }
 
-    public static vehicleWeaponKills(events: TEvent[]): ApiResponse<BreakdownArray> {
+    public static vehicleWeaponKills(events: TEvent[]): Promise<BreakdownArray> {
         const vehKills: StatMap = new StatMap();
 
         for (const event of events) {
@@ -689,7 +679,7 @@ export default class EventReporter {
         );
     }
 
-    public static weaponKills(events: TEvent[]): ApiResponse<BreakdownArray> {
+    public static weaponKills(events: TEvent[]): Promise<BreakdownArray> {
         const wepKills: StatMap = new StatMap();
 
         for (const event of events) {
@@ -705,7 +695,7 @@ export default class EventReporter {
         );
     }
 
-    public static weaponHeadshot(events: TEvent[]): ApiResponse<BreakdownArray> {
+    public static async weaponHeadshot(events: TEvent[]): Promise<BreakdownArray> {
         const total: StatMap = new StatMap();
         const hs: StatMap = new StatMap();
 
@@ -722,36 +712,32 @@ export default class EventReporter {
             }
         }
 
-        const response: ApiResponse<BreakdownArray> = new ApiResponse();
-
         const arr: BreakdownArray = new BreakdownArray();
 
-        WeaponAPI.getByIDs(Array.from(weapons.values())).ok((data: Weapon[]) => {
-            total.getMap().forEach((kills: number, weaponID: string) => {
-                const hsKills: number = hs.get(weaponID, 0);
-                const hsr: number = hsKills / kills;
+        const data: Weapon[] = await WeaponAPI.getByIDs(Array.from(weapons.values()));
 
-                const weapon: Weapon | undefined = data.find(iter => iter.ID == weaponID);
+        total.getMap().forEach((kills: number, weaponID: string) => {
+            const hsKills: number = hs.get(weaponID, 0);
+            const hsr: number = hsKills / kills;
 
-                const entry: Breakdown = {
-                    amount: kills,
-                    display: `${weapon?.name ?? `Weapon ${weaponID}`} ${hsKills}/${kills} (${(hsr * 100).toFixed(2)}%)`,
-                    color: undefined,
-                    sortField: `${kills}`
-                };
+            const weapon: Weapon | undefined = data.find(iter => iter.ID == weaponID);
 
-                arr.data.push(entry);
-            });
+            const entry: Breakdown = {
+                amount: kills,
+                display: `${weapon?.name ?? `Weapon ${weaponID}`} ${hsKills}/${kills} (${(hsr * 100).toFixed(2)}%)`,
+                color: undefined,
+                sortField: `${kills}`
+            };
 
-            arr.total = 1;
-
-            response.resolveOk(arr);
+            arr.data.push(entry);
         });
 
-        return response;
+        arr.total = 1;
+
+        return arr;
     }
 
-    public static weaponTeamkills(events: TEvent[]): ApiResponse<BreakdownArray> {
+    public static weaponTeamkills(events: TEvent[]): Promise<BreakdownArray> {
         const wepKills: StatMap = new StatMap();
 
         for (const ev of events) {
@@ -767,7 +753,7 @@ export default class EventReporter {
         );
     }
 
-    public static weaponDeaths(events: TEvent[], revived: boolean | undefined = undefined): ApiResponse<BreakdownArray> {
+    public static weaponDeaths(events: TEvent[], revived: boolean | undefined = undefined): Promise<BreakdownArray> {
         const amounts: StatMap = new StatMap();
 
         for (const event of events) {
@@ -783,9 +769,8 @@ export default class EventReporter {
         );
     }
 
-    public static weaponTypeKills(events: TEvent[]): ApiResponse<BreakdownArray> {
+    public static async weaponTypeKills(events: TEvent[], loadout?: PsLoadoutType): Promise<BreakdownArray> {
         const amounts: StatMap = new StatMap();
-        const response: ApiResponse<BreakdownArray> = new ApiResponse();
 
         const weaponIDs: string[] = [];
         for (const event of events) {
@@ -795,44 +780,51 @@ export default class EventReporter {
         }
 
         const arr: BreakdownArray = new BreakdownArray();
-        WeaponAPI.getByIDs(weaponIDs).ok((data: Weapon[]) => {
-            for (const event of events) {
-                if (event.type == "kill") {
-                    const weapon = data.find(iter => iter.ID == event.weaponID);
-                    if (weapon == undefined) {
-                        amounts.increment("Unknown");
-                    } else {
-                        amounts.increment(weapon.type);
+        const data: Weapon[] = await WeaponAPI.getByIDs(weaponIDs);
+
+        for (const event of events) {
+            if (event.type == "kill") {
+                if (loadout != undefined) {
+                    if (loadout != PsLoadout.getLoadoutType(event.loadoutID)) {
+                        continue;
                     }
-                    ++arr.total;
                 }
+                const weapon = data.find(iter => iter.ID == event.weaponID);
+                if (weapon == undefined) {
+                    amounts.increment("Unknown");
+                } else {
+                    amounts.increment(weapon.type);
+                }
+                ++arr.total;
             }
+        }
 
-            amounts.getMap().forEach((count: number, wepType: string) => {
-                arr.data.push({
-                    display: wepType,
-                    amount: count,
-                    sortField: wepType,
-                    color: undefined
-                });
+        amounts.getMap().forEach((count: number, wepType: string) => {
+            arr.data.push({
+                display: wepType,
+                amount: count,
+                sortField: wepType,
+                color: undefined
             });
-
-            arr.data.sort((a, b) => {
-                const diff: number = b.amount - a.amount;
-                if (diff == 0) {
-                    return b.display.localeCompare(a.display);
-                }
-                return diff;
-            });
-            response.resolveOk(arr);
         });
 
-        return response;
+        arr.data.sort((a, b) => {
+            const diff: number = b.amount - a.amount;
+            if (diff == 0) {
+                return b.display.localeCompare(a.display);
+            }
+            return diff;
+        });
+
+        return arr;
     }
 
-    public static weaponTypeDeaths(events: TEvent[], revived: boolean | undefined = undefined): ApiResponse<BreakdownArray> {
+    public static async weaponTypeDeaths(events: TEvent[], revivedType: "all" | "unrevived" | "revived", loadout?: PsLoadoutType): Promise<BreakdownArray> {
         const amounts: StatMap = new StatMap();
-        const response: ApiResponse<BreakdownArray> = new ApiResponse();
+
+        const revived: boolean | undefined = revivedType == "all" ? undefined
+            : revivedType == "unrevived" ? false
+            : true;
 
         const weaponIDs: string[] = [];
         for (const event of events) {
@@ -842,44 +834,40 @@ export default class EventReporter {
         }
 
         const arr: BreakdownArray = new BreakdownArray();
-        WeaponAPI.getByIDs(weaponIDs).ok((data: Weapon[]) => {
-            for (const event of events) {
-                if (event.type == "death" && (revived == undefined || event.revived == revived)) {
-                    const weapon = data.find(iter => iter.ID == event.weaponID);
-                    if (weapon == undefined) {
-                        amounts.increment("Unknown");
-                    } else {
-                        amounts.increment(weapon.type);
+        const data: Weapon[] = await WeaponAPI.getByIDs(weaponIDs);
+
+        for (const event of events) {
+            if (event.type == "death" && (revived == undefined || event.revived == revived)) {
+                if (loadout != undefined) {
+                    if (loadout != PsLoadout.getLoadoutType(event.loadoutID)) {
+                        continue;
                     }
-                    ++arr.total;
                 }
+                const weapon = data.find(iter => iter.ID == event.weaponID);
+                if (weapon == undefined) {
+                    amounts.increment("Unknown");
+                } else {
+                    amounts.increment(weapon.type);
+                }
+                ++arr.total;
             }
+        }
 
-            amounts.getMap().forEach((count: number, wepType: string) => {
-                arr.data.push({
-                    display: wepType,
-                    amount: count,
-                    sortField: wepType,
-                    color: undefined
-                });
+        amounts.getMap().forEach((count: number, wepType: string) => {
+            arr.data.push({
+                display: wepType,
+                amount: count,
+                sortField: wepType,
+                color: undefined
             });
-
-            arr.data.sort((a, b) => {
-                const diff: number = b.amount - a.amount;
-                if (diff == 0) {
-                    return b.display.localeCompare(a.display);
-                }
-                return diff;
-            });
-            response.resolveOk(arr);
         });
 
-        return response;
+        arr.data.sort((a, b) => (b.amount - a.amount) || b.display.localeCompare(a.display));
+
+        return arr;
     }
 
-    public static classPlaytimes(times: Playtime[]): ApiResponse<BreakdownArray> {
-        const response: ApiResponse<BreakdownArray> = new ApiResponse();
-
+    public static classPlaytimes(times: Playtime[]): BreakdownArray {
         const arr: BreakdownArray = new BreakdownArray();
 
         const infil: Breakdown = {
@@ -941,14 +929,10 @@ export default class EventReporter {
             return `${hours.toFixed(0).padStart(2, "0")}:${mins.toFixed(0).padStart(2, "0")}:${(seconds % 60).toFixed(0).padStart(2, "0")}`;
         }
 
-        response.resolveOk(arr);
-
-        return response;
+        return arr;
     }
 
-    public static factionKills(events: TEvent[]): ApiResponse<BreakdownArray> {
-        const response: ApiResponse<BreakdownArray> = new ApiResponse();
-
+    public static factionKills(events: TEvent[]): BreakdownArray {
         const arr: BreakdownArray = new BreakdownArray();
 
         const countKills = function(ev: TEvent, faction: string) {
@@ -989,14 +973,10 @@ export default class EventReporter {
 
         arr.total = events.filter(iter => iter.type == "kill").length;
 
-        response.resolveOk(arr);
-
-        return response;
+        return arr;
     }
 
-    public static factionDeaths(events: TEvent[]): ApiResponse<BreakdownArray> {
-        const response: ApiResponse<BreakdownArray> = new ApiResponse();
-
+    public static factionDeaths(events: TEvent[]): BreakdownArray {
         const countDeaths = function(ev: TEvent, faction: string) {
             if (ev.type != "death" || ev.revived == true) {
                 return false;
@@ -1036,14 +1016,10 @@ export default class EventReporter {
 
         arr.total = events.filter(iter => iter.type == "death" && iter.revived == false).length;
 
-        response.resolveOk(arr);
-
-        return response;
+        return arr;
     }
 
-    public static continentKills(events: TEvent[]): ApiResponse<BreakdownArray> {
-        const response: ApiResponse<BreakdownArray> = new ApiResponse();
-
+    public static continentKills(events: TEvent[]): BreakdownArray {
         const countKills = function(ev: TEvent, zoneID: string) {
             return ev.type == "kill" && ev.zoneID == zoneID;
         }
@@ -1079,14 +1055,10 @@ export default class EventReporter {
 
         arr.total = events.filter(iter => iter.type == "kill").length;
 
-        response.resolveOk(arr);
-
-        return response;
+        return arr;
     }
 
-    public static continentDeaths(events: TEvent[]): ApiResponse<BreakdownArray> {
-        const response: ApiResponse<BreakdownArray> = new ApiResponse();
-
+    public static continentDeaths(events: TEvent[]): BreakdownArray {
         const countDeaths = function(ev: TEvent, zoneID: string) {
             return ev.type == "death" && ev.revived == false && ev.zoneID == zoneID;
         }
@@ -1122,12 +1094,10 @@ export default class EventReporter {
 
         arr.total = events.filter(iter => iter.type == "death" && iter.revived == false).length;
 
-        response.resolveOk(arr);
-
-        return response;
+        return arr;
     }
 
-    public static characterKills(events: TEvent[]): ApiResponse<BreakdownArray> {
+    public static characterKills(events: TEvent[]): Promise<BreakdownArray> {
         const amounts: StatMap = new StatMap();
 
         for (const event of events) {
@@ -1143,7 +1113,7 @@ export default class EventReporter {
         );
     }
 
-    public static characterDeaths(events: TEvent[]): ApiResponse<BreakdownArray> {
+    public static characterDeaths(events: TEvent[]): Promise<BreakdownArray> {
         const amounts: StatMap = new StatMap();
 
         for (const event of events) {

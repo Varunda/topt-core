@@ -126,7 +126,7 @@ export class ApiResponse<T = void> {
             //      ResponseContent. Maybe use a switch on localStatus?
             this.resolve({ code: localStatus as ResponseCodes, data: localData } as any);
         }).catch((error: any) => {
-            throw `Don't expect this: ${error}`;
+            throw `Failed to call: ${error}`;
         });
     }
 
@@ -306,11 +306,19 @@ export class ApiResponse<T = void> {
         return new Promise<ResponseContent<T>>((resolve, reject) => {
             this.always(() => {
                 if (this.status == 200) {
-                    resolve({ code: 200, data: this.data as T });
+                    return resolve({ code: 200, data: this.data as T });
                 } else if (this.status == 500) {
-                    resolve({ code: 500, data: this.data as string });
+                    return resolve({ code: 500, data: this.data as string });
+                } else if (this.status == 201) {
+                    return resolve({ code: 201, data: this.data as number });
+                } else if (this.status == 204) {
+                    return resolve({ code: 204, data: null });
+                } else if (this.status == 400) {
+                    return resolve({ code: 400, data: this.data as string });
+                } else if (this.status == 404) {
+                    return resolve({ code: 404, data: this.data as string });
                 } else {
-                    reject(`Unchecked status ${this.status}`);
+                    return reject(`Unchecked status ${this.status}`);
                 }
             });
         });
@@ -485,7 +493,7 @@ export abstract class APIWrapper<T> {
         const promise = axios.default.request({
             url: url,
             data: JSON.stringify(data),
-            validateStatus: null,
+            validateStatus: () => true,
             method: "GET"
         });
 
@@ -510,7 +518,7 @@ export abstract class APIWrapper<T> {
         const promise = axios.default.request({
             url: url,
             data: JSON.stringify(data),
-            validateStatus: null,
+            validateStatus: () => true,
             method: "GET"
         });
 
@@ -533,7 +541,7 @@ export abstract class APIWrapper<T> {
             url: url,
             responseType: "json",
             data: JSON.stringify(data),
-            validateStatus: null,
+            validateStatus: () => true,
             method: "POST"
         });
 
@@ -554,7 +562,7 @@ export abstract class APIWrapper<T> {
         const promise = axios.default.request({
             url: url,
             data: JSON.stringify(data),
-            validateStatus: null,
+            validateStatus: () => true,
             method: "POST"
         });
 
@@ -579,7 +587,7 @@ export abstract class APIWrapper<T> {
         const promise = axios.default.request({
             url: url,
             data: JSON.stringify(data),
-            validateStatus: null,
+            validateStatus: () => true,
             method: "PUT"
         });
 
@@ -601,7 +609,7 @@ export abstract class APIWrapper<T> {
         const promise = axios.default.request({
             url: url,
             data: JSON.stringify(data),
-            validateStatus: null,
+            validateStatus: () => true,
             method: "DELETE"
         });
 

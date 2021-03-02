@@ -33,6 +33,13 @@ declare module "./Core" {
          */
         subscribeToItemAdded(): void;
 
+        /**
+         * 
+         */
+        subscribeToSkillAdded(): void;
+
+        subscribeToAllEventsOnTracked(...expID: string[]): void;
+
     }
 }
 
@@ -86,6 +93,24 @@ Core.prototype.subscribeToAllEvent = function(...expID: string[]): void {
     this.sockets.debug.send(JSON.stringify(msg));
 }
 
+Core.prototype.subscribeToAllEventsOnTracked = function(...expID: string[]): void {
+    if (this.sockets.tracked == null) {
+        return log.error(`Cannot globally subscribe to ${expID}: debug socket is null`);
+    }
+
+    const msg: object = {
+        service: "event",
+        action: "subscribe",
+        characters: ["all"],
+        worlds: ["all"],
+        eventNames: [
+            ...expID.map(iter => `GainExperience_experience_id_${iter}`)
+        ]
+    };
+
+    this.sockets.tracked.send(JSON.stringify(msg));
+}
+
 Core.prototype.subscribeToItemAdded = function(): void {
     if (this.sockets.debug == null) {
         return log.error(`Cannot subscribe to ItemAdded events: debug socket is null`);
@@ -100,6 +125,27 @@ Core.prototype.subscribeToItemAdded = function(): void {
         ],
         eventNames: [
             "ItemAdded"
+        ],
+        logicalAndCharactersWithWorlds: true
+    }
+
+    this.sockets.debug.send(JSON.stringify(msg));
+}
+
+Core.prototype.subscribeToSkillAdded = function(): void {
+    if (this.sockets.debug == null) {
+        return log.error(``);
+    }
+
+    const msg: object = {
+        service: "event",
+        action: "subscribe",
+        characters: ["all"],
+        worlds: [
+            this.serverID
+        ],
+        eventNames: [
+            "SkillAdded"
         ],
         logicalAndCharactersWithWorlds: true
     }
