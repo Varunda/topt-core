@@ -126,7 +126,7 @@ export class ApiResponse<T = void> {
             //      ResponseContent. Maybe use a switch on localStatus?
             this.resolve({ code: localStatus as ResponseCodes, data: localData } as any);
         }).catch((error: any) => {
-            throw `Don't expect this: ${error}`;
+            throw `Failed to call: ${error}`;
         });
     }
 

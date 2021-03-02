@@ -40,6 +40,18 @@ export class CharacterAPI {
         return char;
     }
 
+    public static setCache(chars: Character[]): void {
+        for (const char of chars) {
+            CharacterAPI._cache.set(char.ID, char);
+        }
+    }
+
+    public static getCache(): Character[] {
+        return Array.from(CharacterAPI._cache.values())
+            .filter(iter => iter != null)
+            .map(iter => iter as Character);
+    }
+
     public static getByID(charID: string): Promise<Character | null> {
         if (CharacterAPI._pending.has(charID)) {
             return CharacterAPI._pending.get(charID)!;

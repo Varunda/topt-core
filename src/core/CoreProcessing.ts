@@ -6,9 +6,9 @@ import { PsLoadout, PsLoadouts } from "./census/PsLoadout";
 import { Weapon, WeaponAPI } from "./census/WeaponAPI";
 import { CharacterAPI, Character } from "./census/CharacterAPI";
 
-import { FacilityCapture, PlayerVersus, TrackedRouter } from "./InvididualGenerator";
+import { FacilityCapture, PlayerVersus } from "./InvididualGenerator";
 
-import { TrackedPlayer } from "./objects/TrackedPlayer";
+import { TrackedPlayer, TrackedNpc, TrackedNpcType } from "./objects/index";
 
 import {
     TEvent, TEventType,
@@ -71,65 +71,61 @@ declare module "./Core" {
             const amount: number = Number.parseInt(msg.payload.amount);
             const event: PsEvent | undefined = PsEvents.get(eventID);
 
-            if (eventID == "1410") {
-                if (self.stats.get(charID) != undefined) {
-                    if (self.routerTracking.routerNpcs.has(charID)) {
-                        //log.debug(`${charID} router npc check for ${targetID}`);
-                        const router: TrackedRouter = self.routerTracking.routerNpcs.get(charID)!;
-                        if (router.ID != targetID) {
-                            //log.warn(`New router placed by ${charID}, missed ItemAdded event: removing old one and replacing with ${targetID}`);
-                            router.destroyed = timestamp;
+            if (eventID == PsEvent.constructionSpawn || eventID == PsEvent.sundySpawn) {
+                const type: TrackedNpcType = (eventID == PsEvent.constructionSpawn) ? "router"
+                    : (eventID == PsEvent.sundySpawn) ? "sundy"
+                    : "unknown";
 
-                            self.routerTracking.routers.push({...router});
+                const npcID: number = Number.parseInt(targetID);
 
-                            self.routerTracking.routerNpcs.set(charID, {
-                                ID: targetID,
-                                owner: charID,
-                                pulledAt: timestamp,
-                                firstSpawn: timestamp,
-                                destroyed: undefined,
-                                count: 1, // Count the event that caused the new router to be tracked
-                                type: "router"
-                            });
-                        } else {
-                            //log.debug(`Same router, incrementing count`);
-                            if (router.ID == "") {
-                                router.ID = targetID;
-                            }
-                            if (router.firstSpawn == undefined) {
-                                router.firstSpawn = timestamp;
-                            }
-                            ++router.count;
+                if (type == "router") {
+                    const npcs: TrackedNpc[] = Array.from(self.npcs.active.values());
+
+                    for (const npc of npcs) {
+                        if (npc.ownerID == charID && npc.ID != targetID) {
+                            log.debug(`Router replaced, adding to destroyed`);
+
+                            npc.destroyedAt = timestamp;
+                            npc.destroyedByID = charID;
+
+                            self.npcs.all.push(npc);
+                            self.npcs.active.delete(npc.ID);
                         }
-                    } else {
-                        //log.debug(`${charID} has new router ${targetID} placed/used`);
+                    }
+                }
 
-                        self.routerTracking.routerNpcs.set(charID, {
-                            ID: targetID,
-                            owner: charID,
-                            pulledAt: timestamp,
-                            firstSpawn: timestamp,
-                            destroyed: undefined,
-                            count: 1, // Count the event that caused the new router to be tracked
-                            type: "router"
-                        });
+                if (self.npcs.active.has(targetID) == false) {
+                    const npc: TrackedNpc = {
+                        ID: targetID,
+                        ownerID: charID,
+                        pulledAt: timestamp,
+                        firstSpawnAt: timestamp,
+                        destroyedAt: null,
+                        destroyedByID: null,
+                        spawns: [],
+                        count: 1, // Count the event that caused the new router to be tracked
+                        type: type
                     }
 
-                    save = true;
+                    self.npcs.active.set(targetID, npc);
+
+                    log.debug(`${npc.type}/${npcID.toString(16)} found, placed by ${charID} at ${timestamp}`);
                 }
-            } else if (eventID == "1409") {
-                const trackedNpcs: TrackedRouter[] = Array.from(self.routerTracking.routerNpcs.values());
-                const ids: string[] = trackedNpcs.map(iter => iter.ID);
-                if (ids.indexOf(targetID) > -1) {
-                    const router: TrackedRouter = trackedNpcs.find(iter => iter.ID == targetID)!;
-                    //log.debug(`Router ${router.ID} placed by ${router.owner} destroyed, saving`);
 
-                    router.destroyed = timestamp;
-                    self.routerTracking.routers.push({...router});
+                const npc: TrackedNpc = self.npcs.active.get(targetID)!;
+                npc.spawns.push(timestamp);
+                npc.count += 1;
+            } else if (eventID == PsEvent.routerKill || eventID == PsEvent.sundyDestroyed) {
+                if (self.npcs.active.has(targetID) == true) {
+                    const npc: TrackedNpc = self.npcs.active.get(targetID)!;
 
-                    self.routerTracking.routerNpcs.delete(router.owner);
+                    npc.destroyedAt = timestamp;
+                    npc.destroyedByID = charID;
 
-                    save = true;
+                    self.npcs.all.push({...npc});
+                    self.npcs.active.delete(npc.ID);
+
+                    log.debug(`${npc.type}/${Number.parseInt(npc.ID).toString(16)} destroyed, lasted ${(npc.destroyedAt - npc.pulledAt)/1000}s, killed by ${charID}, ${npc.count} spawns`);
                 }
             }
 
@@ -311,7 +307,7 @@ declare module "./Core" {
 
             let player = self.stats.get(playerID);
             if (player != undefined) {
-                log.debug(`Tracked player ${player.name} got a capture on ${ev.facilityID}`);
+                //log.debug(`Tracked player ${player.name} got a capture on ${ev.facilityID}`);
                 player.stats.increment(PsEvent.baseCapture);
                 player.events.push(ev);
             }
@@ -391,27 +387,30 @@ declare module "./Core" {
 
             if (itemID == "6003551") {
                 if (self.stats.get(charID) != undefined) {
+                    /* Turned off cause it's not actually that useful and making tracking harder
                     //log.debug(`${charID} pulled a new router`);
 
                     if (self.routerTracking.routerNpcs.has(charID)) {
-                        const router: TrackedRouter = self.routerTracking.routerNpcs.get(charID)!;
+                        const router: TrackedNpc = self.routerTracking.routerNpcs.get(charID)!;
                         //log.debug(`${charID} pulled a new router, saving old one`);
-                        router.destroyed = timestamp;
+                        router.destroyedAt = timestamp;
 
                         self.routerTracking.routers.push({...router});
                     }
 
-                    const router: TrackedRouter = {
+                    const router: TrackedNpc = {
                         ID: "", // We don't get the NPC ID until someone spawns on the router
-                        owner: charID,
+                        ownerID: charID,
                         count: 0,
-                        destroyed: undefined,
-                        firstSpawn: undefined,
+                        firstSpawnAt: null,
+                        destroyedAt: null,
+                        destroyedByID: null,
                         pulledAt: timestamp,
                         type: "router"
                     };
 
                     self.routerTracking.routerNpcs.set(charID, router);
+                    */
 
                     save = true;
                 }
@@ -422,23 +421,27 @@ declare module "./Core" {
             const killerWeaponID: string = msg.payload.attacker_weapon_id;
             const vehicleID: string = msg.payload.vehicle_id;
 
+            const ev: TVehicleKillEvent = {
+                type: "vehicle",
+                sourceID: killerID,
+                loadoutID: killerLoadoutID,
+                weaponID: killerWeaponID,
+                targetID: msg.payload.character_id,
+                vehicleID: vehicleID,
+                attackerVehicleID: msg.payload.attacker_vehicle_id,
+                timestamp: timestamp,
+                zoneID: zoneID
+            };
+
             const player = self.stats.get(killerID);
             if (player != undefined) {
-                const ev: TVehicleKillEvent = {
-                    type: "vehicle",
-                    sourceID: killerID,
-                    loadoutID: killerLoadoutID,
-                    weaponID: killerWeaponID,
-                    targetID: msg.payload.character_id,
-                    vehicleID: vehicleID,
-                    timestamp: timestamp,
-                    zoneID: zoneID
-                };
                 player.events.push(ev);
-                save = true;
-
-                self.emit(ev);
+            } else {
+                self.miscEvents.push(ev);
             }
+            self.emit(ev);
+
+            save = true;
         } else if (event == "PlayerLogin") {
             const charID: string = msg.payload.character_id;
             if (this.stats.has(charID)) {

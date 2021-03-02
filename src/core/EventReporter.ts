@@ -386,7 +386,12 @@ export default class EventReporter {
                 throw `Invalid event type '${iter.type}'`;
             });
 
+        log.debug(`Loading ${charIDs.length} characters`);
+
         const data: Character[] = await CharacterAPI.getByIDs(charIDs);
+
+        log.debug(`Loaded ${data.length}/${charIDs.length} characters`);
+
         for (const ev of events) {
             if (ev.type == "kill" || ev.type == "death") {
                 const killedChar = data.find(iter => iter.ID == ev.targetID);

@@ -1,5 +1,3 @@
-import { ApiResponse } from "./census/ApiWrapper";
-
 import { CharacterAPI, Character } from "./census/CharacterAPI";
 import { Weapon, WeaponAPI } from "./census/WeaponAPI";
 import { Achievement, AchievementAPI } from "./census/AchievementAPI";
@@ -21,7 +19,7 @@ import {
     TEventHandler
 } from "./events/index";
 
-import { TrackedPlayer } from "./objects/TrackedPlayer";
+import { TrackedPlayer, TrackedNpcType, TrackedNpc } from "./objects/index";
 
 import { Logger } from "./Loggers";
 const log = Logger.getLogger("IndividualGenerator");
@@ -86,18 +84,6 @@ export function classCollectionBreakdownTrend(): ClassCollectionBreakdownTrend {
     }
 }
 
-export type TrackedNpcType = "router" | "unknown";
-
-export class TrackedRouter {
-    public ID: string = "";
-    public type: TrackedNpcType = "router";
-    public owner: string = "";
-    public pulledAt: number = 0;
-    public firstSpawn: number | undefined = undefined;
-    public destroyed: number | undefined = undefined;
-    public count: number = 0;
-}
-
 export class Playtime {
     public characterID: string = "";
     public secondsOnline: number = 0;
@@ -139,7 +125,7 @@ export class Report {
 
     logistics = {
         show: false as boolean,
-        routers: [] as TrackedRouter[],
+        routers: [] as TrackedNpc[],
         metas: [] as BreakdownMeta[]
     };
 
@@ -256,7 +242,7 @@ export class ReportParameters {
     /**
      * All routers tracked
      */
-    public routers: TrackedRouter[] = [];
+    public routers: TrackedNpc[] = [];
 
 }
 
@@ -611,8 +597,8 @@ export class IndividualReporter {
         return null;
     }
 
-    private static routerBreakdown(parameters: ReportParameters): TrackedRouter[] {
-        const rts: TrackedRouter[] = parameters.routers.filter(iter => iter.owner == parameters.player!.characterID);
+    private static routerBreakdown(parameters: ReportParameters): TrackedNpc[] {
+        const rts: TrackedNpc[] = parameters.routers.filter(iter => iter.ownerID == parameters.player!.characterID);
 
         return rts;
     }

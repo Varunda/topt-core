@@ -150,6 +150,8 @@ function setupLogisticsSocket(core: Core): ApiResponse {
             ],
             eventNames: [
                 "GainExperience_experience_id_1409",    // Router kill
+                "GainExperience_experience_id_60",      // Galaxy kill
+                "GainExperience_experience_id_68",      // Sundy kill
             ],
             logicalAndCharactersWithWorlds: true
         };

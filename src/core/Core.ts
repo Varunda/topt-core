@@ -1,12 +1,10 @@
-import { ApiResponse, ResponseContent } from "./census/ApiWrapper";
-
 import CensusAPI from "./census/CensusAPI";
 import { OutfitAPI, Outfit } from "./census/OutfitAPI";
 import { CharacterAPI, Character } from "./census/CharacterAPI";
 
-import { TrackedPlayer, BaseExchange } from "./objects/index";
+import { TrackedPlayer, BaseExchange, TrackedNpc } from "./objects/index";
 
-import { FacilityCapture, TimeTracking, TrackedRouter } from "./InvididualGenerator";
+import { FacilityCapture, TimeTracking } from "./InvididualGenerator";
 
 import {
     TEvent, TEventType, 
@@ -45,15 +43,20 @@ export class Core {
     };
 
     /**
-     * Collection of variables used to track router placements
+     * NPCs that are tracked
      */
-    public routerTracking = {
-        // key - Who placed the router
-        // value - Lastest npc ID that gave them a router spawn tick
-        routerNpcs: new Map() as Map<string, TrackedRouter>, // <char ID, npc ID>
+    public npcs = {
 
-        routers: [] as TrackedRouter[] // All routers that have been placed
-    };
+        /**
+         * NPCs that are actively providing spawns. <npc_id, npc>
+         */
+        active: new Map() as Map<string, TrackedNpc>,
+
+        /**
+         * All NPCs that were tracked and found
+         */
+        all: [] as TrackedNpc[]
+    }
 
     /**
      * Collection of squad related vars
@@ -275,6 +278,17 @@ export class Core {
                 char.secondsOnline = 0;
             }
         });
+
+        this.npcs.active.forEach((npc: TrackedNpc, npcID: string) => {
+            const withEnd: TrackedNpc = { ...npc };
+            if (withEnd.spawns.length == 0) {
+                withEnd.destroyedAt = withEnd.pulledAt;
+            } else {
+                withEnd.destroyedAt = withEnd.spawns[withEnd.spawns.length - 1];
+            }
+
+            this.npcs.all.push(withEnd);
+        });
     }
 
     /**
@@ -414,24 +428,6 @@ export class Core {
         }
     }
 
-    public promiseTest(): void {
-        const t: ApiResponse<string> = new ApiResponse();
-        const p: Promise<ResponseContent<string>> = t.promise();
-
-        setTimeout(async () => {
-            const contents: ResponseContent<string> = await p;
-            if (contents.code == 200) {
-                console.log(`200: ${contents.data}`);
-            } else if (contents.code == 500) {
-                console.error(`500: ${contents.data}`);
-            }
-        });
-
-        setTimeout(() => {
-            t.resolve({ code: 200, data: `Hello from the other side` });
-        }, 3000);
-    }
-
     /**
      * Subscribe to the events in the event stream and begin tracking them in the squad tracker
      * 
@@ -492,6 +488,30 @@ export class Core {
 
             this.sockets.tracked.send(JSON.stringify(subscribeExp));
         }
+    }
+
+    public subcribeByID(charID: string): void {
+        if (this.sockets.tracked == null) {
+            return log.error(`cannot subscribe to ${charID}, sockets.tracked is null`);
+        }
+
+        const subscribeExp: object = {
+            "action": "subscribe",
+            "characters": [
+                charID
+            ],
+            "eventNames": [
+                "GainExperience",
+                "AchievementEarned",
+                "Death",
+                "FacilityControl",
+                "ItemAdded",
+                "VehicleDestroy"
+            ],
+            "service": "event"
+        };
+
+        this.sockets.tracked.send(JSON.stringify(subscribeExp));
     }
 
     /**

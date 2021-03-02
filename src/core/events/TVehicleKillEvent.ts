@@ -45,4 +45,9 @@ export type TVehicleKillEvent = {
      */
     vehicleID: string;
 
+    /**
+     * ID of the vehicle that killed the vehicleID. May be 0
+     */
+    attackerVehicleID: string;
+
 }

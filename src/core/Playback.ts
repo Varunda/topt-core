@@ -2,7 +2,7 @@
 import { Core } from "./Core";
 
 import { OutfitAPI, Outfit } from "./census/OutfitAPI";
-import { Character } from "./census/CharacterAPI";
+import { Character, CharacterAPI } from "./census/CharacterAPI";
 import { ApiResponse } from "./census/ApiWrapper";
 
 import { Logger } from "./Loggers";
@@ -25,24 +25,34 @@ export class Playback {
         Playback._core = core;
     }
 
-    public static async loadFile(file: File | string): Promise<void> {
-        if (Playback._core == null) {
-            throw `Cannot load file: Core has not been set. Did you forget to use Playback.setCore()?`;
-        }
+    public static loadFile(file: File | string): Promise<void> {
+        return new Promise<void>(async (resolve, reject) => {
+            if (Playback._core == null) {
+                return reject(`Cannot load file: Core has not been set. Did you forget to use Playback.setCore()?`);
+            }
 
-        if (typeof(file) == "string") {
-            log.debug(`using a string`);
-            await this.process(file);
-        } else {
-            log.debug(`using a file`);
-            const reader: FileReader = new FileReader();
+            if (typeof(file) == "string") {
+                log.debug(`using a string`);
+                await this.process(file);
+                return resolve();
+            } else {
+                log.debug(`using a file`);
+                const reader: FileReader = new FileReader();
 
-            reader.onload = (async (ev: ProgressEvent<FileReader>) => {
-                await this.process(reader.result as string)
-            });
+                reader.onload = (async (ev: ProgressEvent<FileReader>) => {
+                    await this.process(reader.result as string)
+                    return resolve();
+                });
+                reader.onabort = (async (ev: ProgressEvent<FileReader>) => {
+                    return reject(`reader aborted`);
+                });
+                reader.onerror = (async (ev: ProgressEvent<FileReader>) => {
+                    return reject(`reader errored`);
+                });
 
-            reader.readAsText(file);
-        }
+                reader.readAsText(file);
+            }
+        });
     }
 
     private static async process(str: string): Promise<void> {
@@ -58,6 +68,10 @@ export class Playback {
             const chars: Character[] = data.players;
             const outfits: (string | object)[] = data.outfits;
             const events: any[] = data.events;
+
+            if (data.characters != undefined) {
+                CharacterAPI.setCache(data.characters);
+            }
 
             // Force online for squad tracking
             this._core!.subscribeToEvents(chars.map(iter => { iter.online = iter.secondsPlayed > 0; return iter; }));

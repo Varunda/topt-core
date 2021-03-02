@@ -1,5 +1,3 @@
-import { ApiResponse } from "../census/ApiWrapper";
-
 import { PsLoadout, PsLoadouts } from "../census/PsLoadout";
 import { PsEventType, PsEvent, PsEvents } from "../PsEvent";
 
@@ -28,6 +26,7 @@ import { SquadStat, TrackedPlayer }  from "../objects/index";
 import { Squad } from "../squad/Squad";
 import { BaseExchange } from "../objects/BaseExchange";
 import { FacilityAPI, Facility } from "../census/FacilityAPI";
+import { ProgressCallback, ProgressNotification } from "../PromiseProgress";
 
 import { Logger } from "../Loggers";
 const log = Logger.getLogger("OutfitReport");
@@ -272,72 +271,51 @@ export class OutfitReport {
     };
 }
 
-type StepState = "idle" | "working" | "errored" | "done";
-
-export class PromiseProgressListener {
-
-    public setSteps(steps: string[]): void {
-
-    }
-
-    public getSteps(steps: string[]): string[] {
-        return [];
-    }
-
-    public getState(step: string): StepState | null {
-        return null;
-    }
-
-    public updateStep(step: string, state: StepState): void {
-
-    }
-}
-
 export class OutfitReportGenerator {
 
-    public static async generate(parameters: OutfitReportParameters, progress?: PromiseProgressListener): Promise<OutfitReport> {
+    public static async generate(parameters: OutfitReportParameters, progress?: ProgressCallback): Promise<OutfitReport> {
         const report: OutfitReport = new OutfitReport();
         report.tracking = parameters.tracking;
 
-        /*
-        response.addStep("Facility captures")
-            .addStep("Weapon kills")
-            .addStep("Weapon type kills")
-            .addStep("Teamkills")
-            .addStep("Faction kills")
-            .addStep("Faction deaths")
-            .addStep("Continent kills")
-            .addStep("Continent deaths")
-            .addStep("All weapon deaths")
-            .addStep("Unrevived weapon deaths")
-            .addStep("Revived weapon deaths")
-            .addStep("All weapon type deaths")
-            .addStep("Unrevived weapon type deaths")
-            .addStep("Revived weapon type deaths")
-            .addStep("Weapon death breakdown")
-            .addStep("Outfit KD")
-            .addStep("Vehicle kills")
-            .addStep("Vehicle weapon kills")
-
-        for (const clazz of ["Infil", "LA", "Medic", "Engineer", "Heavy", "MAX"]) {
-            response.addStep(`Weapon type kills for ${clazz}`);
-            response.addStep(`Weapon type deaths for ${clazz}`);
+        if (progress) {
+            const steps: string[] = [
+                "Facility captures",
+                "Weapon kills",
+                "Teamkills",
+                "Weapon deaths",
+                "Deaths",
+                "Outfit KD",
+                "Vehicle kills",
+                "Class kill breakdown",
+                "Class death breakdown"
+            ];
+            progress({
+                type: "steps",
+                steps: steps
+            });
         }
 
-        let opsLeft: number = response.getSteps().length;
-        const totalOps: number = opsLeft;
-
-        const callback = (step: string) => {
-            return () => {
-                log.debug(`Finished ${step}: Have ${opsLeft - 1} ops left outta ${totalOps}`);
-                response.finishStep(step);
-                if (--opsLeft == 0) {
-                    response.resolveOk(report);
-                }
+        const startStep = (step: string): void => {
+            if (progress) {
+                progress({
+                    type: "update",
+                    step: step,
+                    state: "started"
+                });
             }
         }
-        */
 
+        const endStep = (step: string): void => {
+            if (progress) {
+                progress({
+                    type: "update",
+                    step: step,
+                    state: "done"
+                });
+            }
+        }
+
+        startStep("Facility control");
         const facilityIDs: string[] = parameters.captures.filter(iter => parameters.outfits.indexOf(iter.outfitID) > -1)
             .map(iter => iter.facilityID)
             .filter((value, index, arr) => arr.indexOf(value) == index);
@@ -384,6 +362,8 @@ export class OutfitReportGenerator {
             captures: report.facilityCaptures,
             players: parameters.playerCaptures
         });
+
+        endStep("Facility captures");
 
         const chars: TrackedPlayer[] = Array.from(parameters.players.values());
 
@@ -501,23 +481,31 @@ export class OutfitReportGenerator {
             else if (loadout.type == "max") { ++classCollection.max; }
         }
 
+        startStep("Weapon kills");
         report.weaponKillBreakdown = await EventReporter.weaponKills(report.events);
         report.weaponTypeKillBreakdown = await EventReporter.weaponTypeKills(report.events);
+        endStep("Weapon kills");
 
+        startStep("Teamkills");
         report.teamkillBreakdown = await EventReporter.weaponTeamkills(report.events);
+        endStep("Teamkills");
 
         report.continentKillBreakdown = EventReporter.continentKills(report.events);
         report.continentDeathBreakdown = EventReporter.continentDeaths(report.events);
 
+        startStep("Weapon deaths")
         report.weaponKillBreakdown = await EventReporter.weaponDeaths(report.events);
         report.weaponTypeDeathBreakdown = await EventReporter.weaponDeathBreakdown(report.events);
+        endStep("Weapon deaths");
 
+        startStep("Deaths")
         report.deathAllBreakdown = await EventReporter.weaponDeaths(report.events);
         report.deathRevivedBreakdown = await EventReporter.weaponDeaths(report.events, true);
         report.deathKilledBreakdown = await EventReporter.weaponDeaths(report.events, false);
         report.deathAllTypeBreakdown = await EventReporter.weaponTypeDeaths(report.events, "all");
         report.deathRevivedTypeBreakdown = await EventReporter.weaponTypeDeaths(report.events, "revived");
         report.deathKilledTypeBreakdown = await EventReporter.weaponTypeDeaths(report.events, "unrevived");
+        endStep("Deaths");
 
         /* Not super useful and take a long time to generate
         report.timeUnrevived = IndividualReporter.unrevivedTime(report.events);
@@ -526,19 +514,23 @@ export class OutfitReportGenerator {
         report.kmTimeDead = IndividualReporter.timeUntilReviveRate(report.events);
         */
 
+        startStep("Class kill breakdown")
         report.classTypeKills.infil = await EventReporter.weaponTypeKills(report.events, "infil");
         report.classTypeKills.lightAssault = await EventReporter.weaponTypeKills(report.events, "lightAssault");
         report.classTypeKills.medic = await EventReporter.weaponTypeKills(report.events, "medic");
         report.classTypeKills.engineer = await EventReporter.weaponTypeKills(report.events, "engineer");
         report.classTypeKills.heavy = await EventReporter.weaponTypeKills(report.events, "heavy");
         report.classTypeKills.max = await EventReporter.weaponTypeKills(report.events, "max");
+        endStep("Class kill breakdown");
 
+        startStep("Class death breakdown")
         report.classTypeDeaths.infil = await EventReporter.weaponTypeDeaths(report.events, "all", "infil");
         report.classTypeDeaths.lightAssault = await EventReporter.weaponTypeDeaths(report.events,"all",  "lightAssault");
         report.classTypeDeaths.medic = await EventReporter.weaponTypeDeaths(report.events,"all",  "medic");
         report.classTypeDeaths.engineer = await EventReporter.weaponTypeDeaths(report.events,"all",  "engineer");
         report.classTypeDeaths.heavy = await EventReporter.weaponTypeDeaths(report.events,"all",  "heavy");
         report.classTypeDeaths.max = await EventReporter.weaponTypeDeaths(report.events,"all",  "max");
+        endStep("Class death breakdown");
 
         report.classKds.infil = IndividualReporter.classVersusKd(report.events, "infil");
         report.classKds.lightAssault = IndividualReporter.classVersusKd(report.events, "lightAssault");
@@ -548,10 +540,14 @@ export class OutfitReportGenerator {
         report.classKds.max = IndividualReporter.classVersusKd(report.events, "max");
         report.classKds.total = IndividualReporter.classVersusKd(report.events);
 
+        startStep("Outfit KD")
         report.outfitVersusBreakdown = await EventReporter.outfitVersusBreakdown(report.events);
+        endStep("Outfit KD")
 
+        startStep("Vehicle kills")
         report.vehicleKillBreakdown = await EventReporter.vehicleKills(report.events);
         report.vehicleKillWeaponBreakdown = await EventReporter.vehicleWeaponKills(report.events);
+        endStep("Vehicle kills");
 
         const getSquadStats: (squad: Squad, name: string) => SquadStat = (squad: Squad, name: string) => {
             const squadIDs: string[] = squad.members.map(iter => iter.charID);
