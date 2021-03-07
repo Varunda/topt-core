@@ -422,9 +422,6 @@ export class DesoReportGenerator {
     private static getSpawnTypeBreakdown(parameters: DesoReportParameters): BreakdownArray {
         const arr: BreakdownArray = new BreakdownArray();
 
-        const gal: Breakdown = new Breakdown();
-        gal.display = "Galaxy spawns";
-
         const sundy: Breakdown = new Breakdown();
         sundy.display = "Sunderer spawns";
 
@@ -448,15 +445,13 @@ export class DesoReportGenerator {
                 ++router.amount;
             } else if (ev.expID == PsEvent.sundySpawn) {
                 ++sundy.amount;
-            } else if (ev.expID == PsEvent.galaxySpawn) {
-                ++gal.amount;
             } else if (ev.expID == "355") {
                 ++squad.amount;
             }
         }
 
-        arr.total = gal.amount + sundy.amount + router.amount + beacon.amount + squad.amount;
-        arr.data.push(gal, sundy, router, beacon, squad);
+        arr.total = sundy.amount + router.amount + beacon.amount + squad.amount;
+        arr.data.push(sundy, router, beacon, squad);
 
         return arr;
     }

@@ -81,6 +81,7 @@ declare module "./Core" {
                 if (type == "router") {
                     const npcs: TrackedNpc[] = Array.from(self.npcs.active.values());
 
+                    /*
                     for (const npc of npcs) {
                         if (npc.ownerID == charID && npc.ID != targetID) {
                             log.debug(`Router replaced, adding to destroyed`);
@@ -92,6 +93,7 @@ declare module "./Core" {
                             self.npcs.active.delete(npc.ID);
                         }
                     }
+                    */
                 }
 
                 if (self.npcs.active.has(targetID) == false) {
@@ -387,6 +389,21 @@ declare module "./Core" {
 
             if (itemID == "6003551") {
                 if (self.stats.get(charID) != undefined) {
+                    /*
+                    const npcs: TrackedNpc[] = Array.from(self.npcs.active.values());
+
+                    for (const npc of npcs) {
+                        if (npc.ownerID == charID && npc.type == "router") {
+                            log.debug(`Router replaced, adding to destroyed`);
+
+                            npc.destroyedAt = timestamp;
+                            npc.destroyedByID = charID;
+
+                            self.npcs.all.push(npc);
+                            self.npcs.active.delete(npc.ID);
+                        }
+                    }
+                    */
                     /* Turned off cause it's not actually that useful and making tracking harder
                     //log.debug(`${charID} pulled a new router`);
 

@@ -661,7 +661,7 @@ export class IndividualReporter {
                 score.amount += 1;
 
                 if (exp == PsEvent.other) {
-                    //log.log(`Other: ${JSON.stringify(event)}`);
+                    log.log(`Other: ${JSON.stringify(event)}`);
                 }
             }
         }

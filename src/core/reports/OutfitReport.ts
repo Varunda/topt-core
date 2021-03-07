@@ -493,8 +493,10 @@ export class OutfitReportGenerator {
         report.continentKillBreakdown = EventReporter.continentKills(report.events);
         report.continentDeathBreakdown = EventReporter.continentDeaths(report.events);
 
+        report.factionKillBreakdown = EventReporter.factionKills(report.events);
+        report.factionDeathBreakdown = EventReporter.factionDeaths(report.events);
+
         startStep("Weapon deaths")
-        report.weaponKillBreakdown = await EventReporter.weaponDeaths(report.events);
         report.weaponTypeDeathBreakdown = await EventReporter.weaponDeathBreakdown(report.events);
         endStep("Weapon deaths");
 
