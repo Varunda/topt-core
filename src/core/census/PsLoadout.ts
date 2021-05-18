@@ -43,6 +43,7 @@ export class PsLoadout {
 }
 
 export const PsLoadouts: Map<string, PsLoadout> = new Map<string, PsLoadout>([
+    // NC
     ["1", {
         ID: 1,
         faction: "NC",
@@ -76,7 +77,7 @@ export const PsLoadouts: Map<string, PsLoadout> = new Map<string, PsLoadout>([
         type: "engineer"
     }],
     ["6", {
-        ID: 5,
+        ID: 6,
         faction: "NC",
         longName: "Heavy Assault",
         shortName: "HA",
@@ -92,6 +93,7 @@ export const PsLoadouts: Map<string, PsLoadout> = new Map<string, PsLoadout>([
         type: "max"
     }],
 
+    // TR
     ["8", {
         ID: 8,
         faction: "TR",
@@ -141,6 +143,7 @@ export const PsLoadouts: Map<string, PsLoadout> = new Map<string, PsLoadout>([
         type: "max"
     }],
 
+    // VS
     ["15", {
         ID: 15,
         faction: "VS",
@@ -190,6 +193,7 @@ export const PsLoadouts: Map<string, PsLoadout> = new Map<string, PsLoadout>([
         type: "max"
     }],
 
+    // NS
     ["28", {
         ID: 28,
         faction: "NS",

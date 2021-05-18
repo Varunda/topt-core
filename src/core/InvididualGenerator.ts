@@ -536,7 +536,7 @@ export class IndividualReporter {
 
     private static deployableDestroyedBreakdown(parameters: ReportParameters): BreakdownSingle | null {
         const expIDs: string[] = [
-            "57", // Eng t
+            "57", // Eng turret
             "270", // Squad spawn beacon
             "327", // Tank mines
             "370", // Motion sensor kill

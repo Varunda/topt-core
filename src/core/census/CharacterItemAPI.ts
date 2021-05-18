@@ -1,5 +1,5 @@
-import { ApiResponse } from "./ApiWrapper";
-import CensusAPI from "./CensusAPI";
+import { ApiResponse, ResponseContent } from "./ApiWrapper";
+import { CensusAPI } from "./CensusAPI";
 
 export class CharacterItem {
     public characterID: string = "";
@@ -17,20 +17,30 @@ export class CharacterItemAPI {
         };
     }
 
-    public static getByCharacterID(charID: string): ApiResponse<CharacterItem[]> {
-        const response: ApiResponse<CharacterItem[]> = new ApiResponse();
+    public static async getByCharacterID(charID: string): Promise<CharacterItem[]> {
+        const url: string = `characters_item?character_id=${charID}`;
 
-        const request: ApiResponse = CensusAPI.get(`characters_item?character_id=${charID}`);
+        return new Promise<CharacterItem[]>(async (resolve, reject) => {
+            try {
+                const request: ResponseContent<any> = await CensusAPI.get(url).promise();
 
-        request.ok((data: any) => {
-            const arr: CharacterItem[] = [];
-            for (const elem of data.characters_item_list) {
-                arr.push(CharacterItemAPI.parse(elem));
+                if (request.code == 200) {
+                    if (request.data.returned != 1) {
+                    }
+
+                    const arr: CharacterItem[] = [];
+                    for (const elem of request.data.characters_item_list) {
+                        arr.push(CharacterItemAPI.parse(elem));
+                    }
+
+                    return resolve(arr);
+                } else {
+                    return reject(`API call failed>\n\t${url}\n\t${request.code} ${request.data}`);
+                }
+            } catch (err: any) {
+                return reject(err);
             }
-            response.resolveOk(arr);
         });
-
-        return response;
     }
 
 }

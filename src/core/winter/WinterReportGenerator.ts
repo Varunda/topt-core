@@ -27,11 +27,12 @@ const log = Logger.getLogger("WinterReportGenerator");
 export class WinterMetricIndex {
     public static KILLS: number = 0;
     public static KD: number = 1;
-    public static REVIVES: number = 2;
-    public static HEALS: number = 3;
-    public static RESUPPLIES: number = 4;
-    public static REPAIRS: number = 5;
-    public static SHIELDS: number = 6;
+    public static KPM: number = 2;
+    public static REVIVES: number = 3;
+    public static HEALS: number = 4;
+    public static RESUPPLIES: number = 5;
+    public static REPAIRS: number = 6;
+    public static SHIELDS: number = 7;
 }
 
 export class WinterReportGenerator {
@@ -53,6 +54,7 @@ export class WinterReportGenerator {
         report.essential[WinterMetricIndex.REPAIRS] = this.repairs(parameters);
         report.essential[WinterMetricIndex.RESUPPLIES] = this.resupplies(parameters);
         report.essential[WinterMetricIndex.SHIELDS] = this.shieldRepairs(parameters);
+        report.essential[WinterMetricIndex.KPM] = this.kpm(parameters);
         log.debug(`Loaded ${report.essential.length} essential metrics`);
 
         report.fun.push(this.mostRevived(parameters));
@@ -178,6 +180,25 @@ export class WinterReportGenerator {
             },
             (value: number) => value.toFixed(2)
         );
+    }
+
+    private static kpm(parameters: WinterReportParameters): WinterMetric {
+        return this.value(
+            parameters,
+            (player: TrackedPlayer) => {
+                if (player.stats.get(PsEvent.kill) < 25) {
+                    return 0;
+                }
+                return player.events.filter(iter => iter.type == "kill").length / (player.secondsOnline / 60);
+            },
+            {
+                name: "KPM",
+                funName: "Speed Gunner",
+                description: "Highest KPM",
+                entries: []
+            },
+            (value: number) => value.toFixed(2)
+        )
     }
 
     private static mostRevived(parameters: WinterReportParameters): WinterMetric {

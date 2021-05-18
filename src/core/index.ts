@@ -15,6 +15,9 @@ export * from "./census/OutfitAPI";
 export * from "./census/PsLoadout";
 export * from "./census/VehicleAPI";
 export * from "./census/WeaponAPI";
+export * from "./census/MapAPI";
+export * from "./census/CharacterEventsApi";
+export * from "./census/CharacterItemAPI";
 
 export * from "./objects/index";
 export * from "./events/index";

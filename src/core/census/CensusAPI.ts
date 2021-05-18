@@ -5,7 +5,7 @@ import * as axios from "axios";
 import { Logger } from "../Loggers";
 const log = Logger.getLogger("CensusAPI");
 
-export default class CensusAPI {
+export class CensusAPI {
 
     public static serviceID: string = "";
 

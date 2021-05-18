@@ -1,4 +1,4 @@
-import CensusAPI from "./CensusAPI";
+import { CensusAPI } from "./CensusAPI";
 import { ApiResponse, ResponseContent } from "./ApiWrapper";
 
 import { Logger } from "../Loggers";

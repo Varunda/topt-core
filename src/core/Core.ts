@@ -1,4 +1,4 @@
-import CensusAPI from "./census/CensusAPI";
+import { CensusAPI } from "./census/CensusAPI";
 import { OutfitAPI, Outfit } from "./census/OutfitAPI";
 import { CharacterAPI, Character } from "./census/CharacterAPI";
 
@@ -23,7 +23,7 @@ import { SquadMember } from "./squad/SquadMember"
 import { w3cwebsocket, IMessageEvent } from "websocket";
 
 import { Logger } from "./Loggers";
-const log = Logger.getLogger("Core");
+const log = Logger.getLogger("Core"); 
 
 /**
  * Core class that manages all tracking, sockets, event processing, etc.
@@ -298,7 +298,7 @@ export class Core {
      * 
      * @returns An ApiResponse that will resolve when the outfit has been loaded
      */
-    public async addOutfit(tag: string): Promise<void> {
+    public async addOutfitByTag(tag: string): Promise<void> {
         if (this.connected == false) {
             throw `Cannot track outfit ${tag}: Core is not connected`;
         }
@@ -314,6 +314,26 @@ export class Core {
         } catch (err: any) {
             log.error(err);
         }
+    }
+
+    public async addOutfitByID(ID: string): Promise<void> {
+        if (this.connected == false) {
+            throw ``;
+        }
+
+        try {
+            const outfit: Outfit | null = await OutfitAPI.getByID(ID);
+            if (outfit != null) {
+                this.outfits.push(outfit);
+
+            }
+
+            const chars: Character[] = await OutfitAPI.getCharactersByID(ID);
+            this.subscribeToEvents(chars);
+        } catch (err: any) {
+            log.error(err);
+        }
+
     }
 
     /**

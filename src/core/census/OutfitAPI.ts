@@ -1,4 +1,4 @@
-import CensusAPI from "./CensusAPI";
+import { CensusAPI } from "./CensusAPI";
 import { ApiResponse, ResponseContent } from "./ApiWrapper";
 import { CharacterAPI, Character } from "./CharacterAPI";
 
@@ -118,6 +118,39 @@ export class OutfitAPI {
 
                     const outfit: Outfit = OutfitAPI.parse(request.data.outfit_list[0]);
                     return resolve(outfit);
+                } else {
+                    return reject(`API call failed>\n\t${url}\n\t${request.code} ${request.data}`);
+                }
+            } catch (err: any) {
+                return reject(err);
+            }
+        });
+    }
+
+    public static async getCharactersByID(outfitID: string): Promise<Character[]> {
+        const url: string = `/outfit/?outfit_id=${outfitID}&c:resolve=member_character,member_online_status`;
+
+        return new Promise<Character[]>(async (resolve, reject) => {
+            try {
+                const request: ResponseContent<any> = await CensusAPI.get(url).promise();
+
+                if (request.code == 200) {
+                    if (request.data.returned != 1) {
+                        return reject(`Got ${request.data.returned} results when getting outfit ID ${outfitID}`);
+                    }
+
+                    const chars: Character[] = request.data.outfit_list[0].members
+                        .filter((elem: any) => elem.name != undefined)
+                        .map((elem: any) => {
+                            return CharacterAPI.parseCharacter({
+                                outfit: {
+                                    alias: request.data.outfit_list[0].alias
+                                },
+                                ...elem
+                            });
+                        });
+
+                    return resolve(chars);
                 } else {
                     return reject(`API call failed>\n\t${url}\n\t${request.code} ${request.data}`);
                 }

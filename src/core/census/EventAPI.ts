@@ -1,4 +1,4 @@
-import CensusAPI from "./CensusAPI";
+import { CensusAPI } from "./CensusAPI";
 import { ApiResponse } from "./ApiWrapper";
 //import { Event, EventKill, EventDeath } from "core/events/index";
 
