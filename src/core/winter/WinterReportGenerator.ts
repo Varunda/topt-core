@@ -115,7 +115,7 @@ export class WinterReportGenerator {
     }
 
     private static revives(parameters: WinterReportParameters): WinterMetric {
-        return this.metric(parameters, [PsEvent.revive, PsEvent.squadResupply], {
+        return this.metric(parameters, [PsEvent.revive, PsEvent.squadRevive], {
             name: "Revives",
             funName: "Necromancer",
             description: "Most revives",
