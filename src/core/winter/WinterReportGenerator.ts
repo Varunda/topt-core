@@ -470,7 +470,7 @@ export class WinterReportGenerator {
     }
 
     private static mostESFSKills(parameters: WinterReportParameters): WinterMetric {
-        return this.vehicle(parameters, [Vehicles.mosquito, Vehicles.reaver, Vehicles.scythe], {
+        return this.metric(parameters, ["64", "66", "67", "1565"], {
             name: "ESFs destroyed",
             funName: "Fly Swatter",
             description: "Most ESFs destroyed",
@@ -479,7 +479,7 @@ export class WinterReportGenerator {
     }
 
     private static mostValkKills(parameters: WinterReportParameters): WinterMetric {
-        return this.vehicle(parameters, [Vehicles.valkyrie], {
+        return this.metric(parameters, ["501"], {
             name: "Valks destroyed",
             funName: "Valhalla wrecker",
             description: "Most valks destroyed",
@@ -488,7 +488,7 @@ export class WinterReportGenerator {
     }
 
     private static mostLibKills(parameters: WinterReportParameters): WinterMetric {
-        return this.vehicle(parameters, [Vehicles.liberator], {
+        return this.metric(parameters, ["61"], {
             name: "Libs destroyed",
             funName: "Gunships crashed",
             description: "Most libs destroyed",
@@ -497,7 +497,7 @@ export class WinterReportGenerator {
     }
 
     private static mostGalaxyKills(parameters: WinterReportParameters): WinterMetric {
-        return this.vehicle(parameters, [Vehicles.galaxy], {
+        return this.metric(parameters, ["60"], {
             name: "Galaxies destroyed",
             funName: "Quasar tsunami",
             description: "Most galaxies destroyed",
@@ -506,7 +506,7 @@ export class WinterReportGenerator {
     }
 
     private static mostMBTKills(parameters: WinterReportParameters): WinterMetric {
-        return this.vehicle(parameters, [Vehicles.vanguard, Vehicles.prowler, Vehicles.magrider], {
+        return this.metric(parameters, ["63", "65", "69", "1635"], {
             name: "MBTs destroyed",
             funName: "Heavy Hitter",
             description: "Most MBTs destroyed",
@@ -515,7 +515,7 @@ export class WinterReportGenerator {
     }
 
     private static mostHarasserKills(parameters: WinterReportParameters): WinterMetric {
-        return this.vehicle(parameters, [Vehicles.harasser], {
+        return this.metric(parameters, ["301"], {
             name: "Harassers destroyed",
             funName: "Rasser Harasser",
             description: "Most harassers destroyed",
@@ -524,7 +524,7 @@ export class WinterReportGenerator {
     }
 
     private static mostLightningKills(parameters: WinterReportParameters): WinterMetric {
-        return this.vehicle(parameters, [Vehicles.lightning], {
+        return this.metric(parameters, ["62"], {
             name: "Lightnings destroyed",
             funName: "Thunder Struck",
             description: "Most lightnings destroyed",
@@ -533,7 +533,7 @@ export class WinterReportGenerator {
     }
 
     private static mostSunderersKilled(parameters: WinterReportParameters): WinterMetric {
-        return this.vehicle(parameters, [Vehicles.sunderer], {
+        return this.metric(parameters, ["68"], {
             name: "Sunderers killed",
             funName: "Bus Bully",
             description: "Most sundies destroyed",
